@@ -12,6 +12,7 @@ object Dependencies {
   val scalaFmtVersion = "1.5.1"
 
   // libraries versions
+  val akkaVersion     = "2.5.25"
   val catsVersion     = "1.6.0"
   val monixVersion    = "3.0.0-RC3"
   val specs2Version   = "4.6.0"
@@ -22,6 +23,8 @@ object Dependencies {
     Resolver typesafeRepo "releases"
   )
 
+  // akka
+  val akkaStream         = "com.typesafe.akka"            %% "akka-stream"               % akkaVersion
   // functional libraries
   val cats               = "org.typelevel"                %% "cats-core"                 % catsVersion
   val catsLaws           = "org.typelevel"                %% "cats-laws"                 % catsVersion
@@ -54,7 +57,7 @@ trait Dependencies {
   // resolvers
   val commonResolvers = resolvers
 
-  val mainDeps = Seq(cats, shapeless, scopt, scalaConfig, pureConfig, monixExecution, monixEval, scalaLogging, logback)
+  val mainDeps = Seq(akkaStream, cats, shapeless, scopt, scalaConfig, pureConfig, monixExecution, monixEval, scalaLogging, logback)
 
   val testDeps = Seq(catsLaws, spec2Core, spec2Mock, spec2Scalacheck)
 

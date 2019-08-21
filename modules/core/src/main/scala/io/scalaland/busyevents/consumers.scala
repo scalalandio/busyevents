@@ -75,11 +75,11 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
 }
 
 final class Consumer[Envelope: Extractor, Event: EventDecoder](
-  config:            StreamConfig,
-  log:               Logger,
-  unprocessedEvents: Source[Envelope, Future[Done]],
-  deadLetterQueue:   Flow[EventError[Envelope, Event], Unit, NotUsed],
-  commitEvent:       Sink[Envelope, NotUsed]
+  config:              StreamConfig,
+  log:                 Logger,
+  unprocessedEvents:   Source[Envelope, Future[Done]],
+  deadLetterEnqueue:   Flow[EventError[Envelope, Event], Unit, NotUsed],
+  commitEventConsumed: Sink[Envelope, NotUsed]
 )(
   implicit system: ActorSystem,
   materializer:    Materializer
@@ -106,12 +106,12 @@ final class Consumer[Envelope: Extractor, Event: EventDecoder](
         Flow[Either[EventError[Envelope, Event], Unit]]
           .flatMapConcat {
             case Right(_)    => Source.single(())
-            case Left(error) => Source.single(error).via(deadLetterQueue)
+            case Left(error) => Source.single(error).via(deadLetterEnqueue)
           }
           .withContext[Envelope]
       )
       .map(_._2)
-      .to(commitEvent)
+      .to(commitEventConsumed)
 
     streamWithRetry(pipe.run())
   }

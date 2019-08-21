@@ -11,6 +11,9 @@ import scala.concurrent.Future
 package object busyevents {
 
   type RunToFuture[F[_]] = F ~> Future
+  object RunToFuture {
+    @inline def apply[F[_]](implicit runToFuture: RunToFuture[F]): RunToFuture[F] = runToFuture
+  }
 
   type RawEvent = java.nio.ByteBuffer
   object RawEvent {

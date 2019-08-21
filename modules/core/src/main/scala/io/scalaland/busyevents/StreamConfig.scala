@@ -7,5 +7,6 @@ final case class StreamConfig(
                          minBackoff: FiniteDuration,
                          maxBackoff: FiniteDuration,
                          randomFactor: Double,
-                         maxRetries: Int
+                         maxRetries: Int,
+                         processorParallelism: Int
                        )

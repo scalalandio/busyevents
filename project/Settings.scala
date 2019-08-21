@@ -112,6 +112,9 @@ object Settings extends Dependencies {
 
     libraryDependencies ++= mainDeps,
 
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.10"),
+
     Compile / scalafmtOnCompile := true,
 
     scalastyleFailOnError := true,

@@ -4,7 +4,8 @@ import akka.{ Done, NotUsed }
 import akka.actor.ActorSystem
 import akka.stream.{ KillSwitch, KillSwitches, Materializer }
 import akka.stream.scaladsl._
-import cats.Eval
+import cats.{ Eval, MonadError }
+import cats.implicits._
 import com.typesafe.scalalogging.Logger
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -26,9 +27,24 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
   protected final val eventDecoding: Flow[RawEvent, EventDecodingResult[Event], NotUsed] =
     Flow[RawEvent].map(EventDecoder[Event].apply)
 
-  protected def eventProcessing[F[_]: RunToFuture](
+  protected def eventProcessing[F[_]: MonadError[?, Throwable]: RunToFuture](
     processor: PartialFunction[Event, F[Unit]]
-  ): Flow[Event, Either[EventError[Envelope, Event], Unit], NotUsed] = ???
+  ): Flow[Event, Either[EventError[Envelope, Event], Unit], NotUsed] =
+    Flow[Event].mapAsync(processorParallelism) { event: Event =>
+      RunToFuture[F].apply[Either[EventError[Envelope, Event], Unit]](
+        processor
+          .andThen { result =>
+            result.attempt.map {
+              case Left(error) => EventError.ProcessingError(error.getMessage, event, Some(error))
+              case right       => right
+            }
+          }
+          .applyOrElse[Event, F[Either[EventError[Envelope, Event], Unit]]](
+            event,
+            _ => ().asRight[EventError[Envelope, Event]].pure[F]
+          )
+      )
+    }
 
   protected def streamWithRetry[T](thunk: => Future[T]): Eval[(Future[T], KillSwitch)] = {
 
@@ -58,21 +74,20 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
   }
 }
 
-sealed abstract class Consumer[Envelope: Extractor, Event: EventDecoder](
-  config: StreamConfig,
-  log:    Logger
+final class Consumer[Envelope: Extractor, Event: EventDecoder](
+  config:            StreamConfig,
+  log:               Logger,
+  unprocessedEvents: Source[Envelope, Future[Done]],
+  deadLetterQueue:   Flow[EventError[Envelope, Event], Unit, NotUsed],
+  commitEvent:       Sink[Envelope, NotUsed]
 )(
   implicit system: ActorSystem,
   materializer:    Materializer
 ) extends Processor[Envelope, Event](config, log) {
 
-  protected val unprocessedEvents: Source[Envelope, Future[Done]]
-
-  protected val deadLetterQueue: Flow[EventError[Envelope, Event], Unit, NotUsed]
-
-  protected val commitEvent: Sink[Envelope, NotUsed]
-
-  final def start[F[_]: RunToFuture](processor: PartialFunction[Event, F[Unit]]): Eval[(Future[Done], KillSwitch)] = {
+  def start[F[_]: MonadError[?, Throwable]: RunToFuture](
+    processor: PartialFunction[Event, F[Unit]]
+  ): Eval[(Future[Done], KillSwitch)] = {
     val processing = eventProcessing[F](processor)
     val pipe = unprocessedEvents
       .map(e => e -> e)
@@ -97,6 +112,49 @@ sealed abstract class Consumer[Envelope: Extractor, Event: EventDecoder](
       )
       .map(_._2)
       .to(commitEvent)
+
+    streamWithRetry(pipe.run())
+  }
+}
+
+final class EventRepairer[Envelope: Extractor, Event: EventDecoder](
+  config:              StreamConfig,
+  log:                 Logger,
+  deadLetterEvents:    Source[Envelope, Future[Done]],
+  requeueFailedEvents: Flow[EventError[Envelope, Event], Unit, NotUsed],
+  deadLetterDequeue:   Sink[Envelope, NotUsed]
+)(
+  implicit system: ActorSystem,
+  materializer:    Materializer
+) extends Processor[Envelope, Event](config, log) {
+
+  def start[F[_]: MonadError[?, Throwable]: RunToFuture](
+    processor: PartialFunction[Event, F[Unit]]
+  ): Eval[(Future[Done], KillSwitch)] = {
+    val processing = eventProcessing[F](processor)
+    val pipe = deadLetterEvents
+      .map(envelope => envelope -> envelope)
+      .via(eventExtraction.withContext[Envelope])
+      .via(eventDecoding.withContext[Envelope])
+      .via(
+        Flow[(EventDecodingResult[Event], Envelope)].flatMapConcat {
+          case (EventDecodingResult.Success(event), envelope) =>
+            Source.single[Event](event).via(processing).map(_ -> envelope)
+          case (EventDecodingResult.Failure(message), envelope) =>
+            Source.single(Left(EventError.DecodingError(message, envelope)) -> envelope)
+          case (EventDecodingResult.Skipped, envelope) => Source.single(Right(()) -> envelope)
+        }
+      )
+      .via(
+        Flow[Either[EventError[Envelope, Event], Unit]]
+          .flatMapConcat {
+            case Right(_)    => Source.single(())
+            case Left(error) => Source.single(error).via(requeueFailedEvents)
+          }
+          .withContext[Envelope]
+      )
+      .map(_._2)
+      .to(deadLetterDequeue)
 
     streamWithRetry(pipe.run())
   }

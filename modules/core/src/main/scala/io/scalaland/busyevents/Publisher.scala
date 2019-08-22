@@ -1,8 +1,10 @@
 package io.scalaland.busyevents
 
-final class Publisher[F[_], Envelope](publishing: List[Envelope] => F[Unit]) {
+final class Publisher[F[_], Envelope: Enveloper, Event: EventEncoder](publishing: List[Envelope] => F[Unit]) {
 
-  def publishEvent(event: Envelope): F[Unit] = publishing(List(event))
+  private val event2envelope = EventEncoder[Event] andThen Enveloper[Envelope]
 
-  def publishEvents(events: List[Envelope]): F[Unit] = publishing(events)
+  def publishEvent(event: Event): F[Unit] = publishing(List(event2envelope(event)))
+
+  def publishEvents(events: List[Event]): F[Unit] = publishing(events.map(event2envelope))
 }

@@ -9,17 +9,19 @@ import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.Future
 
-class EventBus[Event, BusEnvelope, DeadLetterQueueEnvelope](
+class EventBus[Event, BusEnvelope, DLQEnvelope](
   config:                      StreamConfig,
   log:                         Logger,
   busConfigurator:             EventBus.BusConfigurator[BusEnvelope],
-  deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DeadLetterQueueEnvelope, Event]
+  deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope, Event]
 ) {
 
   import busConfigurator._
   import deadLetterQueueConfigurator._
 
-  def publisher[F[_]: Async]: Publisher[F, BusEnvelope] = new Publisher[F, BusEnvelope](e => publishEvents[F](e))
+  def publisher[F[_]: Async](implicit eventEncoder: EventEncoder[Event],
+                             enveloper: Enveloper[BusEnvelope]): Publisher[F, BusEnvelope, Event] =
+    new Publisher[F, BusEnvelope, Event](publishEvents[F])
 
   def consumer(
     implicit system:   ActorSystem,
@@ -38,8 +40,8 @@ class EventBus[Event, BusEnvelope, DeadLetterQueueEnvelope](
     implicit system:   ActorSystem,
     materializer:      Materializer,
     eventDecoder:      EventDecoder[Event],
-    envelopeExtractor: Extractor[DeadLetterQueueEnvelope]
-  ): EventRepairer[DeadLetterQueueEnvelope, Event] = new EventRepairer[DeadLetterQueueEnvelope, Event](
+    envelopeExtractor: Extractor[DLQEnvelope]
+  ): EventRepairer[DLQEnvelope, Event] = new EventRepairer[DLQEnvelope, Event](
     config,
     log,
     deadLetterEvents,
@@ -50,27 +52,27 @@ class EventBus[Event, BusEnvelope, DeadLetterQueueEnvelope](
 
 object EventBus {
 
-  trait BusConfigurator[Envelope] {
+  trait BusConfigurator[BusEnvelope] {
 
-    def publishEvents[F[_]: Async](envelope: List[Envelope]): F[Unit]
+    def publishEvents[F[_]: Async](envelope: List[BusEnvelope]): F[Unit]
 
-    def unprocessedEvents:   Source[Envelope, Future[Done]]
-    def commitEventConsumed: Sink[Envelope, NotUsed]
+    def unprocessedEvents:   Source[BusEnvelope, Future[Done]]
+    def commitEventConsumed: Sink[BusEnvelope, NotUsed]
   }
 
-  trait DeadLetterQueueConfigurator[Envelope, Event] {
+  trait DeadLetterQueueConfigurator[DLQEnvelope, Event] {
 
-    def deadLetterEnqueue:   Flow[EventError[Envelope, Event], Unit, NotUsed]
-    def deadLetterEvents:    Source[Envelope, Future[Done]]
-    def requeueFailedEvents: Flow[EventError[Envelope, Event], Unit, NotUsed]
-    def deadLetterDequeue:   Sink[Envelope, NotUsed]
+    def deadLetterEnqueue:   Flow[EventError[Event], Unit, NotUsed]
+    def deadLetterEvents:    Source[DLQEnvelope, Future[Done]]
+    def requeueFailedEvents: Flow[EventError[Event], Unit, NotUsed]
+    def deadLetterDequeue:   Sink[DLQEnvelope, NotUsed]
   }
 
-  def apply[Event, BusEnvelope, DeadLetterQueueEnvelope](
+  def apply[Event, BusEnvelope, DLQEnvelope](
     config:                      StreamConfig,
     log:                         Logger,
     busConfigurator:             EventBus.BusConfigurator[BusEnvelope],
-    deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DeadLetterQueueEnvelope, Event]
-  ): EventBus[Event, BusEnvelope, DeadLetterQueueEnvelope] =
+    deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope, Event]
+  ): EventBus[Event, BusEnvelope, DLQEnvelope] =
     new EventBus(config, log, busConfigurator, deadLetterQueueConfigurator)
 }

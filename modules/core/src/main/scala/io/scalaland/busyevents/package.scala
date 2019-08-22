@@ -26,8 +26,7 @@ package object busyevents {
     def wrap(bytes: Array[Byte]): RawEvent = ByteBuffer.wrap(bytes)
   }
 
-  private[busyevents] implicit class FlowWithContext[In, Out, Mat](val flow: Flow[In, Out, Mat])
-    extends AnyVal {
+  private[busyevents] implicit class FlowWithContext[In, Out, Mat](val flow: Flow[In, Out, Mat]) extends AnyVal {
 
     def withContext[Ctx]: Flow[(In, Ctx), (Out, Ctx), NotUsed] = Flow[(In, Ctx)].flatMapConcat {
       case (in, ctx) =>

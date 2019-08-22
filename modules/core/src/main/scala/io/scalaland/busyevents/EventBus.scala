@@ -13,7 +13,7 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
   config:                      StreamConfig,
   log:                         Logger,
   busConfigurator:             EventBus.BusConfigurator[BusEnvelope],
-  deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope, Event]
+  deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope]
 ) {
 
   import busConfigurator._
@@ -27,6 +27,7 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
     implicit system:   ActorSystem,
     materializer:      Materializer,
     eventDecoder:      EventDecoder[Event],
+    eventEncoder:      EventEncoder[Event],
     envelopeExtractor: Extractor[BusEnvelope]
   ): Consumer[BusEnvelope, Event] = new Consumer(
     config,
@@ -40,6 +41,7 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
     implicit system:   ActorSystem,
     materializer:      Materializer,
     eventDecoder:      EventDecoder[Event],
+    eventEncoder:      EventEncoder[Event],
     envelopeExtractor: Extractor[DLQEnvelope]
   ): EventRepairer[DLQEnvelope, Event] = new EventRepairer[DLQEnvelope, Event](
     config,
@@ -60,19 +62,19 @@ object EventBus {
     def commitEventConsumed: Sink[BusEnvelope, NotUsed]
   }
 
-  trait DeadLetterQueueConfigurator[DLQEnvelope, Event] {
+  trait DeadLetterQueueConfigurator[DLQEnvelope] {
 
-    def deadLetterEnqueue:   Flow[EventError[Event], Unit, NotUsed]
-    def deadLetterEvents:    Source[DLQEnvelope, Future[Done]]
-    def requeueFailedEvents: Flow[EventError[Event], Unit, NotUsed]
-    def deadLetterDequeue:   Sink[DLQEnvelope, NotUsed]
+    def deadLetterEnqueue[Event: EventEncoder]: Flow[EventError[Event], Unit, NotUsed]
+    def deadLetterEvents: Source[DLQEnvelope, Future[Done]]
+    def requeueFailedEvents[Event: EventEncoder]: Flow[EventError[Event], Unit, NotUsed]
+    def deadLetterDequeue: Sink[DLQEnvelope, NotUsed]
   }
 
   def apply[Event, BusEnvelope, DLQEnvelope](
     config:                      StreamConfig,
     log:                         Logger,
     busConfigurator:             EventBus.BusConfigurator[BusEnvelope],
-    deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope, Event]
+    deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope]
   ): EventBus[Event, BusEnvelope, DLQEnvelope] =
     new EventBus(config, log, busConfigurator, deadLetterQueueConfigurator)
 }

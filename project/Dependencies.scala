@@ -12,10 +12,12 @@ object Dependencies {
   val scalaFmtVersion = "1.5.1"
 
   // libraries versions
-  val akkaVersion     = "2.5.25"
-  val catsVersion     = "1.6.0"
-  val monixVersion    = "3.0.0-RC3"
-  val specs2Version   = "4.6.0"
+  val akkaVersion       = "2.5.25"
+  val catsVersion       = "1.6.0"
+  val catsEffectVersion = "1.4.0"
+  val circeVersion      = "0.11.1"
+  val monixVersion      = "3.0.0-RC3"
+  val specs2Version     = "4.6.0"
 
   // resolvers
   val resolvers = Seq(
@@ -27,7 +29,7 @@ object Dependencies {
   val akkaStream         = "com.typesafe.akka"            %% "akka-stream"               % akkaVersion
   // functional libraries
   val cats               = "org.typelevel"                %% "cats-core"                 % catsVersion
-  val catsLaws           = "org.typelevel"                %% "cats-laws"                 % catsVersion
+  val catsEffect         = "org.typelevel"                %% "cats-effect"               % catsEffectVersion
   val shapeless          = "com.chuusai"                  %% "shapeless"                 % "2.3.3"
   // async
   val monixExecution     = "io.monix"                     %% "monix-execution"           % monixVersion
@@ -38,12 +40,15 @@ object Dependencies {
   val pureConfig         = "com.github.pureconfig"        %% "pureconfig"                % "0.11.0"  excludeAll (
           ExclusionRule(   "org.scala-lang")
   )
+  // serialization
+  val circe              = "io.circe"                     %% "circe-core"                % circeVersion
+  val circeGeneric       = "io.circe"                     %% "circe-generic"             % circeVersion
+  val circeParser        = "io.circe"                     %% "circe-parser"              % circeVersion
   // logging
   val scalaLogging       = "com.typesafe.scala-logging"   %% "scala-logging"             % "3.9.2"
   val logback            = "ch.qos.logback"               %  "logback-classic"           % "1.2.3"
   // testing
   val spec2Core          = "org.specs2"                   %% "specs2-core"               % specs2Version
-  val spec2Mock          = "org.specs2"                   %% "specs2-mock"               % specs2Version
   val spec2Scalacheck    = "org.specs2"                   %% "specs2-scalacheck"         % specs2Version
 }
 
@@ -57,9 +62,9 @@ trait Dependencies {
   // resolvers
   val commonResolvers = resolvers
 
-  val mainDeps = Seq(akkaStream, cats, shapeless, scopt, scalaConfig, pureConfig, monixExecution, monixEval, scalaLogging, logback)
+  val mainDeps = Seq(akkaStream, cats, catsEffect, scalaLogging)
 
-  val testDeps = Seq(catsLaws, spec2Core, spec2Mock, spec2Scalacheck)
+  val testDeps = Seq(spec2Core, spec2Scalacheck)
 
   implicit final class ProjectRoot(project: Project) {
 

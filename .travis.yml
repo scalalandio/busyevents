@@ -5,6 +5,8 @@ jdk:
               - openjdk8
               - oraclejdk8
 dist:           trusty
+services:
+              - docker
 cache:
   directories:
               - $HOME/.ivy2/cache
@@ -14,8 +16,13 @@ install:
               - sudo apt-get install zsh
               - sudo chmod +x scripts/*
               - ./sbt update
+before_script:
+              - sudo service mysql stop
+              - sudo service postgresql stop
+              - docker-compose up -d
 script:         ./sbt fullCoverageTest
 after_script:
+              - docker-compose down --remove-orphans
               - scripts/prepare-test-results-for-ci.sh
               - find $HOME/.sbt -name "*.lock" | xargs rm
               - find $HOME/.ivy2 -name "ivydata-*.properties" | xargs rm

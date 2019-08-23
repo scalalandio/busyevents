@@ -1,0 +1,13 @@
+version: "3.3"
+
+services:
+
+  kinesalite:
+    image: dlsniper/kinesalite:latest
+    ports:
+      - 4567:4501
+
+  dynalite:
+    image: dlsniper/dynalite:latest
+    ports:
+      - 4567:4502

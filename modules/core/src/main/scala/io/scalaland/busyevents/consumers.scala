@@ -1,5 +1,7 @@
 package io.scalaland.busyevents
 
+import java.util.UUID
+
 import akka.{ Done, NotUsed }
 import akka.actor.ActorSystem
 import akka.stream.{ KillSwitch, KillSwitches, Materializer, SharedKillSwitch }
@@ -18,7 +20,7 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
 
   import config._
 
-  protected final val killSwitch: SharedKillSwitch = KillSwitches.shared(workerId)
+  protected final val mkKillSwitch: String => SharedKillSwitch = KillSwitches.shared
 
   protected final val eventExtraction: Flow[Envelope, RawEvent, NotUsed] = Flow[Envelope].map(Extractor[Envelope].apply)
 
@@ -41,7 +43,7 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
       )
     }
 
-  protected def streamWithRetry[T](thunk: => Future[T]): Eval[(Future[T], KillSwitch)] = {
+  protected def streamWithRetry[T](thunk: (String, SharedKillSwitch) => Future[T]): Eval[(Future[T], KillSwitch)] = {
 
     case class Retry(attempt: Int = 0, delay: FiniteDuration = minBackoff) {
       def shouldRetry: Boolean = attempt < maxRetries
@@ -52,35 +54,39 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
         }) min maxBackoff)
     }
 
-    Eval.later(killSwitch).map[(Future[T], KillSwitch)] { killSwitch =>
-      implicit val ec: ExecutionContext = system.dispatcher
+    Eval
+      .later(s"${config.appName}-worker-${UUID.randomUUID()}")
+      .map(w => w -> mkKillSwitch(w))
+      .map[(Future[T], KillSwitch)] {
+        case (workerId, killSwitch) =>
+          implicit val ec: ExecutionContext = system.dispatcher
 
-      val future = Retry().tailRecM[Future, T] { retry =>
-        thunk.map(_.asRight[Retry]).recoverWith {
-          case error if retry.shouldRetry =>
-            akka.pattern.after(retry.delay, system.scheduler)(
-              Future.successful {
-                log.error(s"Event stream returned error, restarting due to retry policy", error)
-                retry.nextRetry.asLeft[T]
-              }
-            )
-          case error =>
-            Future.failed {
-              log.error(s"Event stream returned error, terminating due to retry policy", error)
-              error
+          val future = Retry().tailRecM[Future, T] { retry =>
+            thunk(workerId, killSwitch).map(_.asRight[Retry]).recoverWith {
+              case error if retry.shouldRetry =>
+                akka.pattern.after(retry.delay, system.scheduler)(
+                  Future.successful {
+                    log.error(s"Event stream returned error, restarting due to retry policy", error)
+                    retry.nextRetry.asLeft[T]
+                  }
+                )
+              case error =>
+                Future.failed {
+                  log.error(s"Event stream returned error, terminating due to retry policy", error)
+                  error
+                }
             }
-        }
-      }
+          }
 
-      future -> killSwitch
-    }
+          future -> killSwitch
+      }
   }
 }
 
 final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](
   config:              StreamConfig,
   log:                 Logger,
-  unprocessedEvents:   Source[BusEnvelope, Future[Done]],
+  unprocessedEvents:   (String, SharedKillSwitch) => Source[BusEnvelope, NotUsed],
   deadLetterEnqueue:   Flow[EventError[Event], Unit, NotUsed],
   commitEventConsumed: Sink[BusEnvelope, NotUsed]
 )(
@@ -90,10 +96,11 @@ final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](
 
   def start[F[_]: MonadError[?[_], Throwable]: RunToFuture](
     processor: PartialFunction[Event, F[Unit]]
-  ): Eval[(Future[Done], KillSwitch)] = {
+  ): Eval[(Future[Done], KillSwitch)] = streamWithRetry { (workerId, killSwitch) =>
     val processing = eventProcessing[F](processor)
-    val pipe = unprocessedEvents
-      .map(e => e -> e)
+    val pipe = unprocessedEvents(workerId, killSwitch)
+      .alsoToMat(Sink.ignore)(Keep.right)
+      .map(envelope => envelope -> envelope)
       .via(eventExtraction.withContext[BusEnvelope])
       .via(eventDecoding.withContext[BusEnvelope])
       .via(
@@ -116,14 +123,14 @@ final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](
       .map(_._2)
       .to(commitEventConsumed)
 
-    streamWithRetry(pipe.run())
+    pipe.run
   }
 }
 
 final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
   config:              StreamConfig,
   log:                 Logger,
-  deadLetterEvents:    Source[DLQEnvelope, Future[Done]],
+  deadLetterEvents:    Source[DLQEnvelope, NotUsed],
   requeueFailedEvents: Flow[EventError[Event], Unit, NotUsed],
   deadLetterDequeue:   Sink[DLQEnvelope, NotUsed]
 )(
@@ -133,9 +140,10 @@ final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
 
   def start[F[_]: MonadError[?[_], Throwable]: RunToFuture](
     processor: PartialFunction[Event, F[Unit]]
-  ): Eval[(Future[Done], KillSwitch)] = {
+  ): Eval[(Future[Done], KillSwitch)] = streamWithRetry { (_, _) =>
     val processing = eventProcessing[F](processor)
     val pipe = deadLetterEvents
+      .alsoToMat(Sink.ignore)(Keep.right)
       .map(envelope => envelope -> envelope)
       .via(eventExtraction.withContext[DLQEnvelope])
       .via(eventDecoding.withContext[DLQEnvelope])
@@ -159,6 +167,6 @@ final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
       .map(_._2)
       .to(deadLetterDequeue)
 
-    streamWithRetry(pipe.run())
+    pipe.run()
   }
 }

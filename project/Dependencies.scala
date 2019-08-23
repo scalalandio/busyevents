@@ -26,30 +26,33 @@ object Dependencies {
   )
 
   // akka
-  val akkaStream         = "com.typesafe.akka"            %% "akka-stream"               % akkaVersion
+  val akkaStream         = "com.typesafe.akka"            %% "akka-stream"                 % akkaVersion
+  val alpakkaKafka       = "com.typesafe.akka"            %% "akka-stream-kafka"           % "1.0.5"
+  val kinesisStreams     = "com.500px"                    %% "kinesis-stream"              % "0.1.6"
+  val alpakkaSQS         = "com.lightbend.akka"           %% "akka-stream-alpakka-sqs"     % "1.1.1"
+  // clients
+  val kinesisClient      = "software.amazon.kinesis"      %  "amazon-kinesis-client"       % "2.2.2"
   // functional libraries
-  val cats               = "org.typelevel"                %% "cats-core"                 % catsVersion
-  val catsEffect         = "org.typelevel"                %% "cats-effect"               % catsEffectVersion
-  val shapeless          = "com.chuusai"                  %% "shapeless"                 % "2.3.3"
+  val cats               = "org.typelevel"                %% "cats-core"                   % catsVersion
+  val catsEffect         = "org.typelevel"                %% "cats-effect"                 % catsEffectVersion
+  val shapeless          = "com.chuusai"                  %% "shapeless"                   % "2.3.3"
   // async
-  val monixExecution     = "io.monix"                     %% "monix-execution"           % monixVersion
-  val monixEval          = "io.monix"                     %% "monix-eval"                % monixVersion
+  val monixExecution     = "io.monix"                     %% "monix-execution"             % monixVersion
+  val monixEval          = "io.monix"                     %% "monix-eval"                  % monixVersion
   // config
-  val scopt              = "com.github.scopt"             %% "scopt"                     % "3.7.1"
-  val scalaConfig        = "com.typesafe"                 %  "config"                    % "1.3.4"
-  val pureConfig         = "com.github.pureconfig"        %% "pureconfig"                % "0.11.0"  excludeAll (
-          ExclusionRule(   "org.scala-lang")
-  )
+  val scopt              = "com.github.scopt"             %% "scopt"                       % "3.7.1"
+  val scalaConfig        = "com.typesafe"                 %  "config"                      % "1.3.4"
+  val pureConfig         = "com.github.pureconfig"        %% "pureconfig"                  % "0.11.0"
   // serialization
-  val circe              = "io.circe"                     %% "circe-core"                % circeVersion
-  val circeGeneric       = "io.circe"                     %% "circe-generic"             % circeVersion
-  val circeParser        = "io.circe"                     %% "circe-parser"              % circeVersion
+  val circe              = "io.circe"                     %% "circe-core"                  % circeVersion
+  val circeGeneric       = "io.circe"                     %% "circe-generic"               % circeVersion
+  val circeParser        = "io.circe"                     %% "circe-parser"                % circeVersion
   // logging
-  val scalaLogging       = "com.typesafe.scala-logging"   %% "scala-logging"             % "3.9.2"
-  val logback            = "ch.qos.logback"               %  "logback-classic"           % "1.2.3"
+  val scalaLogging       = "com.typesafe.scala-logging"   %% "scala-logging"               % "3.9.2"
+  val logback            = "ch.qos.logback"               %  "logback-classic"             % "1.2.3"
   // testing
-  val spec2Core          = "org.specs2"                   %% "specs2-core"               % specs2Version
-  val spec2Scalacheck    = "org.specs2"                   %% "specs2-scalacheck"         % specs2Version
+  val spec2Core          = "org.specs2"                   %% "specs2-core"                 % specs2Version
+  val spec2Scalacheck    = "org.specs2"                   %% "specs2-scalacheck"           % specs2Version
 }
 
 trait Dependencies {

@@ -1,13 +1,13 @@
 package io.scalaland.busyevents
 
-import akka.{ Done, NotUsed }
+import akka.{ NotUsed }
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
-import akka.stream.Materializer
+import akka.stream.{ ActorMaterializer, SharedKillSwitch }
 import cats.effect.Async
 import com.typesafe.scalalogging.Logger
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext }
 
 class EventBus[Event, BusEnvelope, DLQEnvelope](
   config:                      StreamConfig,
@@ -25,7 +25,8 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
 
   def consumer(
     implicit system:   ActorSystem,
-    materializer:      Materializer,
+    materializer:      ActorMaterializer,
+    executionContext:  ExecutionContext,
     eventDecoder:      EventDecoder[Event],
     eventEncoder:      EventEncoder[Event],
     envelopeExtractor: Extractor[BusEnvelope]
@@ -39,7 +40,8 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
 
   def repairer(
     implicit system:   ActorSystem,
-    materializer:      Materializer,
+    materializer:      ActorMaterializer,
+    executionContext:  ExecutionContext,
     eventDecoder:      EventDecoder[Event],
     eventEncoder:      EventEncoder[Event],
     envelopeExtractor: Extractor[DLQEnvelope]
@@ -50,6 +52,19 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
     requeueFailedEvents,
     deadLetterDequeue
   )
+
+  // TODO: just an idea for now
+  def migrateTo[NewBusEnvelope, NewDLQEnvelope](eventBus: EventBus[Event, NewBusEnvelope, NewDLQEnvelope]): Unit =
+    migrateAdjustedTo(eventBus)(identity[Event])
+  def migrateAdjustedTo[NewEvent, NewBusEnvelope, NewDLQEnvelope](
+    eventBus: EventBus[NewEvent, NewBusEnvelope, NewDLQEnvelope]
+  )(
+    migration: Event => NewEvent
+  ): Unit = {
+    eventBus.hashCode()
+    migration.hashCode()
+    ()
+  }
 }
 
 object EventBus {
@@ -58,16 +73,40 @@ object EventBus {
 
     def publishEvents[F[_]: Async](envelope: List[BusEnvelope]): F[Unit]
 
-    def unprocessedEvents:   Source[BusEnvelope, Future[Done]]
-    def commitEventConsumed: Sink[BusEnvelope, NotUsed]
+    def unprocessedEvents(
+      implicit system: ActorSystem,
+      materializer:    ActorMaterializer,
+      ec:              ExecutionContext
+    ): (String, SharedKillSwitch) => Source[BusEnvelope, NotUsed]
+    def commitEventConsumed(
+      implicit system: ActorSystem,
+      materializer:    ActorMaterializer,
+      ec:              ExecutionContext
+    ): Sink[BusEnvelope, NotUsed]
   }
 
   trait DeadLetterQueueConfigurator[DLQEnvelope] {
 
-    def deadLetterEnqueue[Event: EventEncoder]: Flow[EventError[Event], Unit, NotUsed]
-    def deadLetterEvents: Source[DLQEnvelope, Future[Done]]
-    def requeueFailedEvents[Event: EventEncoder]: Flow[EventError[Event], Unit, NotUsed]
-    def deadLetterDequeue: Sink[DLQEnvelope, NotUsed]
+    def deadLetterEnqueue[Event: EventEncoder](
+      implicit system: ActorSystem,
+      materializer:    ActorMaterializer,
+      ec:              ExecutionContext
+    ): Flow[EventError[Event], Unit, NotUsed]
+    def deadLetterEvents(
+      implicit system: ActorSystem,
+      materializer:    ActorMaterializer,
+      ec:              ExecutionContext
+    ): Source[DLQEnvelope, NotUsed]
+    def requeueFailedEvents[Event: EventEncoder](
+      implicit system: ActorSystem,
+      materializer:    ActorMaterializer,
+      ec:              ExecutionContext
+    ): Flow[EventError[Event], Unit, NotUsed]
+    def deadLetterDequeue(
+      implicit system: ActorSystem,
+      materializer:    ActorMaterializer,
+      ec:              ExecutionContext
+    ): Sink[DLQEnvelope, NotUsed]
   }
 
   def apply[Event, BusEnvelope, DLQEnvelope](

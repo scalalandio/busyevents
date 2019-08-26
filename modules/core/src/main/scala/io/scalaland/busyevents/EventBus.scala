@@ -1,13 +1,13 @@
 package io.scalaland.busyevents
 
-import akka.{ NotUsed }
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
 import akka.stream.{ ActorMaterializer, SharedKillSwitch }
-import cats.effect.Async
+import cats.effect.{ Async, Timer }
 import com.typesafe.scalalogging.Logger
 
-import scala.concurrent.{ ExecutionContext }
+import scala.concurrent.ExecutionContext
 
 class EventBus[Event, BusEnvelope, DLQEnvelope](
   config:                      StreamConfig,
@@ -19,8 +19,9 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
   import busConfigurator._
   import deadLetterQueueConfigurator._
 
-  def publisher[F[_]: Async](implicit eventEncoder: EventEncoder[Event],
-                             enveloper: Enveloper[BusEnvelope]): Publisher[F, BusEnvelope, Event] =
+  def publisher[F[_]: Async: Timer](implicit eventEncoder: EventEncoder[Event],
+                                    enveloper: Enveloper[BusEnvelope],
+                                    ec:        ExecutionContext): Publisher[F, BusEnvelope, Event] =
     new Publisher[F, BusEnvelope, Event](publishEvents[F])
 
   def consumer(
@@ -71,7 +72,7 @@ object EventBus {
 
   trait BusConfigurator[BusEnvelope] {
 
-    def publishEvents[F[_]: Async](envelope: List[BusEnvelope]): F[Unit]
+    def publishEvents[F[_]: Async: Timer](envelope: List[BusEnvelope])(implicit ec: ExecutionContext): F[Unit]
 
     def unprocessedEvents(
       implicit system: ActorSystem,

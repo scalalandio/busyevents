@@ -1,12 +1,9 @@
 package io.scalaland.busyevents
 
-import scala.concurrent.duration.FiniteDuration
+import io.scalaland.busyevents.utils.RetryConfig
 
 final case class StreamConfig(
   appName:              String,
-  minBackoff:           FiniteDuration,
-  maxBackoff:           FiniteDuration,
-  randomFactor:         Double,
-  maxRetries:           Int,
-  processorParallelism: Int
+  processorParallelism: Int,
+  retryConfig:          RetryConfig
 )

@@ -9,9 +9,9 @@ import akka.stream.scaladsl._
 import cats.{ Eval, MonadError }
 import cats.implicits._
 import com.typesafe.scalalogging.Logger
+import io.scalaland.busyevents.utils.Retry
 
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.Future
 
 sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config: StreamConfig,
                                                                           protected val log: Logger)(
@@ -43,44 +43,20 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
       )
     }
 
-  protected def streamWithRetry[T](thunk: (String, SharedKillSwitch) => Future[T]): Eval[(Future[T], KillSwitch)] = {
-
-    case class Retry(attempt: Int = 0, delay: FiniteDuration = minBackoff) {
-      def shouldRetry: Boolean = attempt < maxRetries
-      def nextRetry: Retry =
-        copy(attempt + 1, ((delay * randomFactor) match {
-          case fd: FiniteDuration => fd
-          case _ => maxBackoff
-        }) min maxBackoff)
-    }
-
+  protected def streamWithRetry[T](thunk: (String, SharedKillSwitch) => Future[T]): Eval[(Future[T], KillSwitch)] =
     Eval
       .later(s"${config.appName}-worker-${UUID.randomUUID()}")
       .map(w => w -> mkKillSwitch(w))
       .map[(Future[T], KillSwitch)] {
         case (workerId, killSwitch) =>
-          implicit val ec: ExecutionContext = system.dispatcher
-
-          val future = Retry().tailRecM[Future, T] { retry =>
-            thunk(workerId, killSwitch).map(_.asRight[Retry]).recoverWith {
-              case error if retry.shouldRetry =>
-                akka.pattern.after(retry.delay, system.scheduler)(
-                  Future.successful {
-                    log.error(s"Event stream returned error, restarting due to retry policy", error)
-                    retry.nextRetry.asLeft[T]
-                  }
-                )
-              case error =>
-                Future.failed {
-                  log.error(s"Event stream returned error, terminating due to retry policy", error)
-                  error
-                }
-            }
+          val future = Retry(retryConfig)(thunk(workerId, killSwitch)) { error =>
+            log.error(s"Event stream returned error, restarting due to retry policy", error)
+          } { error =>
+            log.error(s"Event stream returned error, terminating due to retry policy", error)
           }
 
           future -> killSwitch
       }
-  }
 }
 
 final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](

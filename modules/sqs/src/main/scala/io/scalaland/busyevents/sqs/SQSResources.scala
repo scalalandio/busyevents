@@ -1,4 +1,4 @@
-package io.scalaland.busyevents.kinesis
+package io.scalaland.busyevents.sqs
 
 import java.net.URI
 
@@ -10,11 +10,9 @@ import software.amazon.awssdk.http.async.SdkAsyncHttpClient
 import software.amazon.awssdk.http.Protocol
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
-import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
-import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
+import software.amazon.awssdk.services.sqs.SqsAsyncClient
 
-object AWSClientResources {
+object SQSResources {
 
   final case class ClientConfig[C](
     httpClient:          SdkAsyncHttpClient     = NettyNioAsyncHttpClient.builder().protocol(Protocol.HTTP1_1).build(),
@@ -41,18 +39,8 @@ object AWSClientResources {
   private def resource[F[_]: Sync, A <: SdkClient](thunk: => A): Resource[F, A] =
     Resource.fromAutoCloseable[F, A](Sync[F].delay(thunk))
 
-  def kinesis[F[_]: Sync](
-    config: ClientConfig[KinesisAsyncClient] = ClientConfig()
-  ): Resource[F, KinesisAsyncClient] =
-    resource[F, KinesisAsyncClient](config.configure(KinesisAsyncClient.builder()))
-
-  def dynamo[F[_]: Sync](
-    config: ClientConfig[DynamoDbAsyncClient] = ClientConfig()
-  ): Resource[F, DynamoDbAsyncClient] =
-    resource[F, DynamoDbAsyncClient](config.configure(DynamoDbAsyncClient.builder()))
-
-  def cloudWatch[F[_]: Sync](
-    config: ClientConfig[CloudWatchAsyncClient] = ClientConfig()
-  ): Resource[F, CloudWatchAsyncClient] =
-    resource[F, CloudWatchAsyncClient](config.configure(CloudWatchAsyncClient.builder()))
+  def sqs[F[_]: Sync](
+    config: ClientConfig[SqsAsyncClient] = ClientConfig()
+  ): Resource[F, SqsAsyncClient] =
+    resource[F, SqsAsyncClient](config.configure(SqsAsyncClient.builder()))
 }

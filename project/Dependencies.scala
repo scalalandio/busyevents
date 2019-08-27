@@ -16,7 +16,6 @@ object Dependencies {
   val catsVersion       = "1.6.0"
   val catsEffectVersion = "1.4.0"
   val circeVersion      = "0.11.1"
-  val monixVersion      = "3.0.0-RC3"
   val specs2Version     = "4.6.0"
 
   // resolvers
@@ -28,21 +27,14 @@ object Dependencies {
   // akka
   val akkaStream         = "com.typesafe.akka"            %% "akka-stream"                 % akkaVersion
   val alpakkaKafka       = "com.typesafe.akka"            %% "akka-stream-kafka"           % "1.0.5"
-  val kinesisStreams     = "com.500px"                    %% "kinesis-stream"              % "0.1.6"
+  val kinesisStreams     = "com.500px"                    %% "kinesis-stream"              % "0.1.7"
   val alpakkaSQS         = "com.lightbend.akka"           %% "akka-stream-alpakka-sqs"     % "1.1.1"
   // clients
+  val awsNioClient       = "software.amazon.awssdk"       %  "netty-nio-client"            % "2.5.10"
   val kinesisClient      = "software.amazon.kinesis"      %  "amazon-kinesis-client"       % "2.2.2"
   // functional libraries
   val cats               = "org.typelevel"                %% "cats-core"                   % catsVersion
   val catsEffect         = "org.typelevel"                %% "cats-effect"                 % catsEffectVersion
-  val shapeless          = "com.chuusai"                  %% "shapeless"                   % "2.3.3"
-  // async
-  val monixExecution     = "io.monix"                     %% "monix-execution"             % monixVersion
-  val monixEval          = "io.monix"                     %% "monix-eval"                  % monixVersion
-  // config
-  val scopt              = "com.github.scopt"             %% "scopt"                       % "3.7.1"
-  val scalaConfig        = "com.typesafe"                 %  "config"                      % "1.3.4"
-  val pureConfig         = "com.github.pureconfig"        %% "pureconfig"                  % "0.11.0"
   // serialization
   val circe              = "io.circe"                     %% "circe-core"                  % circeVersion
   val circeGeneric       = "io.circe"                     %% "circe-generic"               % circeVersion

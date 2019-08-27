@@ -17,10 +17,10 @@ import scala.concurrent.ExecutionContext
 class SQSDeadLetterQueueConfigurator(
   sqsDeadLetterQueueConfig: SQSDeadLetterQueueConfig,
   log:                      Logger,
-  sqsAsyncClient:           SqsAsyncClient,
   sqsPublishSettings:       SqsPublishSettings,
   sqsSourceSettings:        SqsSourceSettings,
-  sqsAckSettings:           SqsAckSettings
+  sqsAckSettings:           SqsAckSettings,
+  sqsAsyncClient:           SqsAsyncClient
 ) extends EventBus.DeadLetterQueueConfigurator[Message] {
 
   import sqsDeadLetterQueueConfig._
@@ -77,4 +77,28 @@ class SQSDeadLetterQueueConfigurator(
         log.info(s"Event ${ack.messageAction.message.messageId} dequeued from SQS")
       }
       .to(Sink.ignore)
+}
+
+object SQSDeadLetterQueueConfigurator {
+
+  /** Useful if you wanted to make something like:
+    *
+    * {{{
+    * (sqsResource).map(SQSDealLetterQueueConfigurator(config, log))
+    * }}}
+    */
+  def apply(sqsDeadLetterQueueConfig: SQSDeadLetterQueueConfig,
+            log:                      Logger,
+            sqsPublishSettings:       SqsPublishSettings = SqsPublishSettings(),
+            sqsSourceSettings:        SqsSourceSettings = SqsSourceSettings(),
+            sqsAckSettings:           SqsAckSettings = SqsAckSettings())(
+    sqsAsyncClient:                   SqsAsyncClient
+  ): SQSDeadLetterQueueConfigurator = new SQSDeadLetterQueueConfigurator(
+    sqsDeadLetterQueueConfig,
+    log,
+    sqsPublishSettings,
+    sqsSourceSettings,
+    sqsAckSettings,
+    sqsAsyncClient
+  )
 }

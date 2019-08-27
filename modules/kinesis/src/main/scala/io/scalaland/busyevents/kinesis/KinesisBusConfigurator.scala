@@ -113,7 +113,7 @@ object KinesisBusConfigurator {
     * (kinesisResource, dynamoResource, cloudWatchResource).mapN(KinesisBusConfigurator(config, log))
     * }}}
     *
-    * used "default" KinesisBusSchedulerFactory
+    * uses "default" KinesisBusSchedulerFactory
     */
   def apply(kinesisBusConfig: KinesisBusConfig, log: Logger)(
     kinesisAsyncClient:       KinesisAsyncClient,

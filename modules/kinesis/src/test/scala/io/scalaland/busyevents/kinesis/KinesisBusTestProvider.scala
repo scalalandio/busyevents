@@ -12,11 +12,11 @@ trait KinesisBusTestProvider extends BusTestProvider with ResourcesSpec {
   override type BusEnvelope = KinesisEnvelope
   override lazy val busConfigurator: EventBus.BusConfigurator[KinesisEnvelope] = useResource {
     // TODO: set up configs
-    val kinesisBusConfig: KinesisBusConfig = null
+    val kinesisBusConfig: KinesisBusConfig = KinesisBusConfig("kinesis-test", "kinesis-bus", "kinesis-bus-check")
     (
-      AWSClientResources.kinesis[SyncIO](),
-      AWSClientResources.dynamo[SyncIO](),
-      AWSClientResources.cloudWatch[SyncIO]()
+      KinesisResources.kinesis[SyncIO](),
+      KinesisResources.dynamo[SyncIO](),
+      KinesisResources.cloudWatch[SyncIO]()
     ).mapN(KinesisBusConfigurator(kinesisBusConfig, log))
   }
   override val busImplementation = "Kinesis"

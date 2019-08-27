@@ -71,7 +71,8 @@ lazy val sqs = project.from("sqs")
   .configureModule
   .configureTests()
   .settings(
-    libraryDependencies += Dependencies.alpakkaSQS
+    libraryDependencies += Dependencies.alpakkaSQS,
+    libraryDependencies += Dependencies.awsNioClient
   )
   .dependsOn(core, laws % "test->compile")
 

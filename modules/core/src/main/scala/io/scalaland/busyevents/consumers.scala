@@ -146,3 +146,5 @@ final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
     pipe.run()
   }
 }
+
+// TODO: add migration: old bus -> new bus, old dlq -> new dlq, as the third consumer

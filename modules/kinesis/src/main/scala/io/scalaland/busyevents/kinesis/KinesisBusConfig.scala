@@ -9,5 +9,5 @@ final case class KinesisBusConfig(
   dynamoTableName:               String,
   parentShardPollIntervalMillis: Long = 250L,
   metricsLevel:                  MetricsLevel = MetricsLevel.SUMMARY,
-  initialPositionInStream:       InitialPositionInStream = InitialPositionInStream.TRIM_HORIZON
+  initialPositionInStream:       InitialPositionInStream = InitialPositionInStream.TRIM_HORIZON,
 )

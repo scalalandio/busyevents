@@ -24,7 +24,10 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
                                  log:                   Logger,
                                  kinesisAsyncClient:    KinesisAsyncClient,
                                  dynamoDbAsyncClient:   DynamoDbAsyncClient,
-                                 cloudWatchAsyncClient: CloudWatchAsyncClient) { cfg =>
+                                 cloudWatchAsyncClient: CloudWatchAsyncClient,
+                                 checkpointConfig:      CheckpointConfig = CheckpointConfig(),
+                                 coordinatorFactory:    SchedulerCoordinatorFactory = new SchedulerCoordinatorFactory) {
+  cfg =>
 
   import kinesisBusConfig._
 
@@ -72,9 +75,18 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
 
   // overridable
 
-  protected def checkpointConfig: CheckpointConfig = CheckpointConfig()
+  protected implicit def logger: LoggingAdapter = new LoggingAdapter {
+    def isErrorEnabled:   Boolean = true
+    def isWarningEnabled: Boolean = true
+    def isInfoEnabled:    Boolean = true
+    def isDebugEnabled:   Boolean = true
 
-  protected def coordinatorFactory: SchedulerCoordinatorFactory = new SchedulerCoordinatorFactory
+    protected def notifyError(message:   String): Unit = cfg.log.error(message)
+    protected def notifyError(cause:     Throwable, message: String): Unit = cfg.log.error(message, cause)
+    protected def notifyWarning(message: String): Unit = cfg.log.warn(message)
+    protected def notifyInfo(message:    String): Unit = cfg.log.info(message)
+    protected def notifyDebug(message:   String): Unit = cfg.log.debug(message)
+  }
 
   protected def recordProcessorFactory(workerId:    String,
                                        killSwitch:  SharedKillSwitch,
@@ -82,20 +94,6 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
     implicit system:                                ActorSystem,
     materializer:                                   ActorMaterializer,
     ec:                                             ExecutionContext
-  ): RecordProcessorFactoryImpl = {
-    val tracker = CheckpointTracker(workerId, checkpointConfig)
-    implicit val logger: LoggingAdapter = new LoggingAdapter {
-      def isErrorEnabled:   Boolean = true
-      def isWarningEnabled: Boolean = true
-      def isInfoEnabled:    Boolean = true
-      def isDebugEnabled:   Boolean = true
-
-      protected def notifyError(message:   String): Unit = cfg.log.error(message)
-      protected def notifyError(cause:     Throwable, message: String): Unit = cfg.log.error(message, cause)
-      protected def notifyWarning(message: String): Unit = cfg.log.warn(message)
-      protected def notifyInfo(message:    String): Unit = cfg.log.info(message)
-      protected def notifyDebug(message:   String): Unit = cfg.log.debug(message)
-    }
-    new RecordProcessorFactoryImpl(publishSink, workerId, tracker, killSwitch)
-  }
+  ): RecordProcessorFactoryImpl =
+    new RecordProcessorFactoryImpl(publishSink, workerId, CheckpointTracker(workerId, checkpointConfig), killSwitch)
 }

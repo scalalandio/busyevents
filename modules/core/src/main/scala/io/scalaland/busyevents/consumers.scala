@@ -106,7 +106,7 @@ final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](
 final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
   config:              StreamConfig,
   log:                 Logger,
-  deadLetterEvents:    Source[DLQEnvelope, NotUsed],
+  deadLetterEvents:    (String, SharedKillSwitch) => Source[DLQEnvelope, NotUsed],
   requeueFailedEvents: Flow[EventError[Event], Unit, NotUsed],
   deadLetterDequeue:   Sink[DLQEnvelope, NotUsed]
 )(
@@ -116,9 +116,9 @@ final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
 
   def start[F[_]: MonadError[?[_], Throwable]: RunToFuture](
     processor: PartialFunction[Event, F[Unit]]
-  ): Eval[(Future[Done], KillSwitch)] = streamWithRetry { (_, _) =>
+  ): Eval[(Future[Done], KillSwitch)] = streamWithRetry { (workerId, killSwitch) =>
     val processing = eventProcessing[F](processor)
-    val pipe = deadLetterEvents
+    val pipe = deadLetterEvents(workerId, killSwitch)
       .alsoToMat(Sink.ignore)(Keep.right)
       .map(envelope => envelope -> envelope)
       .via(eventExtraction.withContext[DLQEnvelope])

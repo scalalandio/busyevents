@@ -50,7 +50,7 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
     config,
     log,
     deadLetterEvents,
-    requeueFailedEvents,
+    deadLetterEnqueue,
     deadLetterDequeue
   )
 
@@ -97,12 +97,7 @@ object EventBus {
       implicit system: ActorSystem,
       materializer:    ActorMaterializer,
       ec:              ExecutionContext
-    ): Source[DLQEnvelope, NotUsed]
-    def requeueFailedEvents[Event: EventEncoder](
-      implicit system: ActorSystem,
-      materializer:    ActorMaterializer,
-      ec:              ExecutionContext
-    ): Flow[EventError[Event], Unit, NotUsed]
+    ): (String, SharedKillSwitch) => Source[DLQEnvelope, NotUsed]
     def deadLetterDequeue(
       implicit system: ActorSystem,
       materializer:    ActorMaterializer,

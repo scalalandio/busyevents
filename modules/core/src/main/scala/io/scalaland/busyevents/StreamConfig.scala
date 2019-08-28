@@ -5,5 +5,5 @@ import io.scalaland.busyevents.utils.RetryConfig
 final case class StreamConfig(
   appName:              String,
   processorParallelism: Int,
-  retryConfig:          RetryConfig
+  retryConfig:          RetryConfig = RetryConfig()
 )

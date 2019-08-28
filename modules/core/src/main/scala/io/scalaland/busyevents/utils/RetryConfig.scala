@@ -1,10 +1,10 @@
 package io.scalaland.busyevents.utils
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 final case class RetryConfig(
-  minBackoff:   FiniteDuration,
-  maxBackoff:   FiniteDuration,
-  randomFactor: Double,
-  maxRetries:   Int
+  minBackoff:   FiniteDuration = 1.second,
+  maxBackoff:   FiniteDuration = 1.minute,
+  randomFactor: Double         = 2.0,
+  maxRetries:   Int            = 10
 )

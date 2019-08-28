@@ -19,6 +19,8 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
   import busConfigurator._
   import deadLetterQueueConfigurator._
 
+  // TODO: describe guarantees that each implementation should (and shouldn't) provide
+
   def publisher[F[_]: Async: Timer](implicit eventEncoder: EventEncoder[Event],
                                     enveloper: Enveloper[BusEnvelope],
                                     ec:        ExecutionContext): Publisher[F, BusEnvelope, Event] =
@@ -70,6 +72,8 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
 
 object EventBus {
 
+  // TODO: describe contracts that each configurator is expected to hold
+
   trait BusConfigurator[BusEnvelope] {
 
     def publishEvents[F[_]: Async: Timer](envelope: List[BusEnvelope])(implicit ec: ExecutionContext): F[Unit]
@@ -105,11 +109,10 @@ object EventBus {
     ): Sink[DLQEnvelope, NotUsed]
   }
 
-  def apply[Event, BusEnvelope, DLQEnvelope](
-    config:                      StreamConfig,
-    log:                         Logger,
-    busConfigurator:             EventBus.BusConfigurator[BusEnvelope],
-    deadLetterQueueConfigurator: EventBus.DeadLetterQueueConfigurator[DLQEnvelope]
+  // TODO: docs
+  def apply[Event, BusEnvelope, DLQEnvelope](config: StreamConfig, log: Logger)(
+    busConfigurator:                                 EventBus.BusConfigurator[BusEnvelope],
+    deadLetterQueueConfigurator:                     EventBus.DeadLetterQueueConfigurator[DLQEnvelope]
   ): EventBus[Event, BusEnvelope, DLQEnvelope] =
     new EventBus(config, log, busConfigurator, deadLetterQueueConfigurator)
 }

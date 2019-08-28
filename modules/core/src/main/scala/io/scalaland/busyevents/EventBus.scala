@@ -9,6 +9,9 @@ import com.typesafe.scalalogging.Logger
 
 import scala.concurrent.ExecutionContext
 
+// TODO: support context as: Map[String, String] -> Ctx and extract it from headers od other metadata
+// TODO: wrap logger with something configurable when it comes to msg format (e.g plain vs json)
+
 class EventBus[Event, BusEnvelope, DLQEnvelope](
   config:                      StreamConfig,
   log:                         Logger,

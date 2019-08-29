@@ -2,7 +2,7 @@ package io.scalaland.busyevents
 
 import cats.effect.{ Async, Resource, Sync }
 
-trait DLQTestProvider {
+trait DLQTestProvider extends TestProvider {
 
   type DLQEnvelope
 

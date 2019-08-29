@@ -2,12 +2,17 @@ version: "3.3"
 
 services:
 
-  kinesalite:
+  kinesis:
     image: dlsniper/kinesalite:latest
     ports:
       - 4567:4501
 
-  dynalite:
+  dynamodb:
     image: dlsniper/dynalite:latest
     ports:
       - 4567:4502
+
+  sqs:
+    image: softwaremill/elasticmq:latest
+    ports:
+      - 9324:4503

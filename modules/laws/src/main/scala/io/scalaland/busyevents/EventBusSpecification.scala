@@ -16,7 +16,7 @@ trait EventBusSpecification extends Specification with BeforeAfterAll {
 
   val implementationName: String = s"$codecImplementationName-$busImplementationName-$dlqImplementationName"
 
-  val log: Logger = Logger(s"event-bus.$implementationName")
+  override val log: Logger = Logger(s"event-bus.$implementationName")
 
   // I haven't found easier and "better" way to do this
   var publisher: Publisher[IO, BusEnvelope, Event] = _

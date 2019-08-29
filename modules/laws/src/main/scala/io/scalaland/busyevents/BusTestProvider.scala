@@ -2,7 +2,7 @@ package io.scalaland.busyevents
 
 import cats.effect.{ Async, Resource, Sync }
 
-trait BusTestProvider {
+trait BusTestProvider extends TestProvider {
 
   type BusEnvelope
 

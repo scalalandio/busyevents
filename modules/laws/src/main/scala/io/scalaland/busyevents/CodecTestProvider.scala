@@ -1,6 +1,6 @@
 package io.scalaland.busyevents
 
-trait CodecTestProvider {
+trait CodecTestProvider extends TestProvider {
 
   type Event
 

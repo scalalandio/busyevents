@@ -8,5 +8,5 @@ trait TestProvider {
 
   val providerId: UUID = UUID.randomUUID()
 
-  val log: Logger
+  def log: Logger
 }

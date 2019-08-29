@@ -6,10 +6,10 @@ trait DLQTestProvider extends TestProvider {
 
   type DLQEnvelope
 
-  implicit val dlqExtractor: Extractor[DLQEnvelope]
+  implicit def dlqExtractor: Extractor[DLQEnvelope]
 
   def dlqEnvironment[F[_]:  Async]: Resource[F, Unit]
   def dlqConfigurator[F[_]: Sync]:  Resource[F, EventBus.DeadLetterQueueConfigurator[DLQEnvelope]]
 
-  val dlqImplementationName: String
+  def dlqImplementationName: String
 }

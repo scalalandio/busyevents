@@ -1,6 +1,6 @@
 package io.scalaland.busyevents
 
-final class `KinesisBus-SQSDLQ-CirceEncoder-CombinationTest`
+final class `CirceEncoder-KinesisBus-SQSDLQ-CombinationTest`
     extends EventBusSpecification
     with circe.CirceTestProvider
     with kinesis.KinesisBusTestProvider

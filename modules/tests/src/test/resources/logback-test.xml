@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false" debug="false">
+
+  <!-- Logs internal actions for programmer -->
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} | %-5level %-40logger{38} | %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!--<root level="error">-->
+  <root level="off">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+  <logger name="com.amazonaws" level="WARN" />
+</configuration>

@@ -1,18 +1,28 @@
 version: "3.3"
 
+networks:
+  busyevents:
+    driver: bridge
+
 services:
 
   kinesis:
     image: dlsniper/kinesalite:latest
+    networks:
+      - busyevents
     ports:
-      - 4567:4501
+      - 4501:4567
 
   dynamodb:
     image: dlsniper/dynalite:latest
+    networks:
+      - busyevents
     ports:
-      - 4567:4502
+      - 4502:4567
 
   sqs:
     image: softwaremill/elasticmq:latest
+    networks:
+      - busyevents
     ports:
-      - 9324:4503
+      - 4503:9324

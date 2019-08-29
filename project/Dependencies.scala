@@ -25,6 +25,7 @@ object Dependencies {
   )
 
   // akka
+  val akkaSlf4j          = "com.typesafe.akka"            %% "akka-slf4j"                  % akkaVersion
   val akkaStream         = "com.typesafe.akka"            %% "akka-stream"                 % akkaVersion
   val alpakkaKafka       = "com.typesafe.akka"            %% "akka-stream-kafka"           % "1.0.5"
   val kinesisStreams     = "com.500px"                    %% "kinesis-stream"              % "0.1.7"
@@ -57,7 +58,7 @@ trait Dependencies {
   // resolvers
   val commonResolvers = resolvers
 
-  val mainDeps = Seq(akkaStream, cats, catsEffect, scalaLogging)
+  val mainDeps = Seq(akkaSlf4j, akkaStream, cats, catsEffect, scalaLogging)
 
   val testDeps = Seq(spec2Core, spec2Scalacheck)
 

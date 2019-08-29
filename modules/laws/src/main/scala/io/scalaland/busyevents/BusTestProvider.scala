@@ -6,11 +6,11 @@ trait BusTestProvider extends TestProvider {
 
   type BusEnvelope
 
-  implicit val busEnveloper: Enveloper[BusEnvelope]
-  implicit val busExtractor: Extractor[BusEnvelope]
+  implicit def busEnveloper: Enveloper[BusEnvelope]
+  implicit def busExtractor: Extractor[BusEnvelope]
 
   def busEnvironment[F[_]:  Async]: Resource[F, Unit]
   def busConfigurator[F[_]: Sync]:  Resource[F, EventBus.BusConfigurator[BusEnvelope]]
 
-  val busImplementationName: String
+  def busImplementationName: String
 }

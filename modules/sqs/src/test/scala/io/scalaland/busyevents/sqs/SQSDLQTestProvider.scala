@@ -6,20 +6,27 @@ import java.net.URI
 import cats.effect.{ Async, Resource, Sync }
 import cats.implicits._
 import io.scalaland.busyevents.sqs.SQSResources.ClientConfig
+import software.amazon.awssdk.auth.credentials.{ AwsBasicCredentials, StaticCredentialsProvider }
+import software.amazon.awssdk.core.SdkSystemSetting
 import software.amazon.awssdk.services.sqs.model.{ CreateQueueRequest, DeleteQueueRequest, Message }
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 
 trait SQSDLQTestProvider extends DLQTestProvider {
 
-  private val sqsEndpoint  = "http://0.0.0.0:4503/"
-  private val sqsQueueName = s"sqs-dlq-$providerId"
-  private val sqsQueueUrl  = s"$sqsEndpoint/queue/dlqName"
-  private val sqsConfig: ClientConfig[SqsAsyncClient] =
-    ClientConfig().copy(endpointOverride = Some(URI.create(sqsEndpoint)))
+  System.setProperty(SdkSystemSetting.CBOR_ENABLED.property, "false")
+
+  private def sqsEndpoint  = "http://0.0.0.0:4503/"
+  private def sqsQueueName = s"sqs-dlq-$providerId"
+  private def sqsQueueUrl  = s"$sqsEndpoint/queue/dlqName"
+  private def sqsConfig: ClientConfig[SqsAsyncClient] =
+    ClientConfig(
+      credentialsProvider = StaticCredentialsProvider.create(AwsBasicCredentials.create("mock", "mock")),
+      endpointOverride    = Some(URI.create(sqsEndpoint))
+    )
 
   override type DLQEnvelope = Message
 
-  override val dlqExtractor: Extractor[DLQEnvelope] = sqsExtractor
+  override def dlqExtractor: Extractor[DLQEnvelope] = sqsExtractor
 
   override def dlqEnvironment[F[_]: Async]: Resource[F, Unit] = {
     val sqsQueue = SQSResources.sqs[F](sqsConfig).flatMap { sqs =>
@@ -34,5 +41,5 @@ trait SQSDLQTestProvider extends DLQTestProvider {
   override def dlqConfigurator[F[_]: Sync]: Resource[F, EventBus.DeadLetterQueueConfigurator[Message]] =
     SQSResources.sqs[F](sqsConfig).map(SQSDeadLetterQueueConfigurator(SQSDeadLetterQueueConfig(sqsQueueUrl), log))
 
-  override val dlqImplementationName = "SQS"
+  override def dlqImplementationName = "SQS"
 }

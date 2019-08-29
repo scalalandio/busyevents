@@ -81,7 +81,7 @@ lazy val tests = project.from("tests")
   .setDescription("Tests of modules")
   .setInitialImport()
   .configureModule
-  .configureTests()
+  .configureTests(requiresFork = true)
   .settings(
     libraryDependencies += Dependencies.logback
   )

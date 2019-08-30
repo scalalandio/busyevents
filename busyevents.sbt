@@ -5,7 +5,7 @@ lazy val root = project.root
   .setName("busyevents")
   .setDescription("BusyEvents build script")
   .configureRoot
-  .aggregate(core, laws, circe, kafka, kinesis, sqs, tests)
+  .aggregate(core, laws, jsonCirce, apacheKafka, awsCommon, awsKinesis, awsSQS, tests)
 
 lazy val core = project.from("core")
   .setName("busyevents-core")
@@ -28,9 +28,11 @@ lazy val laws = project.from("laws")
   )
   .dependsOn(core)
 
-lazy val circe = project.from("circe")
+// encoders integrations
+
+lazy val jsonCirce = project.from("json-circe")
   .setName("busyevents-circe")
-  .setDescription("Turn Circe codecs into busyevent codecs")
+  .setDescription("Turn Circe codecs into busyevents codecs")
   .setInitialImport("io.scalaland.busyevents.circe._")
   .configureModule
   .configureTests()
@@ -41,10 +43,12 @@ lazy val circe = project.from("circe")
   )
   .dependsOn(core, laws % "test->compile")
 
-lazy val kafka = project.from("kafka")
+// Apache integrations
+
+lazy val apacheKafka = project.from("apache-kafka")
   .setName("busyevents-kafka")
   .setDescription("Use Apache Kafka as event bus")
-  .setInitialImport("io.scalaland.busyevents.kafka._")
+  .setInitialImport("io.scalaland.busyevents.apache.kafka._")
   .configureModule
   .configureTests()
   .settings(
@@ -52,29 +56,45 @@ lazy val kafka = project.from("kafka")
   )
   .dependsOn(core, laws % "test->compile")
 
-lazy val kinesis = project.from("kinesis")
+// AWS integrations
+
+lazy val awsCommon = project.from("aws-common")
+  .setName("busyevents-aws-common")
+  .setDescription("Common AWs configs of all AWS integrations")
+  .setInitialImport("io.scalaland.busyevents.aws._")
+  .configureModule
+  .configureTests()
+  .settings(
+    libraryDependencies += Dependencies.awsSDKCore,
+    libraryDependencies += Dependencies.awsNioClient
+  )
+  .dependsOn(core, laws % "test->compile")
+
+lazy val awsKinesis = project.from("aws-kinesis")
   .setName("busyevents-kinesis")
   .setDescription("Use AWS Kinesis as event bus")
-  .setInitialImport("io.scalaland.busyevents.kinesis._")
+  .setInitialImport("io.scalaland.busyevents.aws.kinesis._")
   .configureModule
   .configureTests()
   .settings(
     libraryDependencies += Dependencies.kinesisClient,
     libraryDependencies += Dependencies.kinesisStreams
   )
-  .dependsOn(core, laws % "test->compile")
+  .compileAndTestDependsOn(awsCommon)
 
-lazy val sqs = project.from("sqs")
+lazy val awsSQS = project.from("aws-sqs")
   .setName("busyevents-sqs")
   .setDescription("Use AWS SQS as dead letter queue")
-  .setInitialImport("io.scalaland.busyevents.sqs._")
+  .setInitialImport("io.scalaland.busyevents.aws.sqs._")
   .configureModule
   .configureTests()
   .settings(
     libraryDependencies += Dependencies.alpakkaSQS,
     libraryDependencies += Dependencies.awsNioClient
   )
-  .dependsOn(core, laws % "test->compile")
+  .compileAndTestDependsOn(awsCommon)
+
+// tests
 
 lazy val tests = project.from("tests")
   .setName("tests")
@@ -86,7 +106,7 @@ lazy val tests = project.from("tests")
     libraryDependencies += Dependencies.logback
   )
   .dependsOn(core, laws % "test->compile")
-  .compileAndTestDependsOn(circe, kafka, kinesis, sqs)
+  .compileAndTestDependsOn(jsonCirce, apacheKafka, awsKinesis, awsSQS)
 
 addCommandAlias("fullTest", ";test;scalastyle")
 addCommandAlias("fullCoverageTest", ";coverage;test;coverageReport;coverageAggregate;scalastyle")

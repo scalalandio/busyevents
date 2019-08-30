@@ -13,6 +13,7 @@ object Dependencies {
 
   // libraries versions
   val akkaVersion       = "2.5.25"
+  val awsSdkVersion     = "2.5.65"
   val catsVersion       = "1.6.0"
   val catsEffectVersion = "1.4.0"
   val circeVersion      = "0.11.1"
@@ -31,7 +32,8 @@ object Dependencies {
   val kinesisStreams     = "com.500px"                    %% "kinesis-stream"              % "0.1.7"
   val alpakkaSQS         = "com.lightbend.akka"           %% "akka-stream-alpakka-sqs"     % "1.1.1"
   // clients
-  val awsNioClient       = "software.amazon.awssdk"       %  "netty-nio-client"            % "2.5.10"
+  val awsSDKCore         = "software.amazon.awssdk"       %  "aws-core"                    % awsSdkVersion
+  val awsNioClient       = "software.amazon.awssdk"       %  "netty-nio-client"            % awsSdkVersion
   val kinesisClient      = "software.amazon.kinesis"      %  "amazon-kinesis-client"       % "2.2.2"
   // functional libraries
   val cats               = "org.typelevel"                %% "cats-core"                   % catsVersion

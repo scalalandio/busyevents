@@ -21,13 +21,10 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with TestP
 
   // I haven't found easier and "better" way to do this
   // scalastyle:off
-  var publisher: Publisher[IO, BusEnvelope, Event] =
-    new Publisher[IO, BusEnvelope, Event](_ => ().pure[IO])
-  var consumer: Consumer[BusEnvelope, Event] =
-    new Consumer[BusEnvelope, Event](null, null, null, null, null)(null, null, null, null)
-  var repairer: EventRepairer[DLQEnvelope, Event] =
-    new EventRepairer[DLQEnvelope, Event](null, null, null, null, null)(null, null, null, null)
-  var teardown: Option[IO[Unit]] = None
+  var publisher: Publisher[IO, BusEnvelope, Event] = _
+  var consumer:  Consumer[BusEnvelope, Event]      = _
+  var repairer:  EventRepairer[DLQEnvelope, Event] = _
+  var teardown:  Option[IO[Unit]]                  = None
   // scalastyle:on
 
   private def implementationResource =
@@ -55,21 +52,42 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with TestP
   s"$codecImplementationName encoder with $busImplementationName bus with $dlqImplementationName DLQ" should {
 
     "provide Publisher that sends all events in batch or none" in {
+      // TODO: quota of events sent at once
+      val publishableEvents = events(10) // scalastyle:ignore
+      publisher.publishEvents(publishableEvents).unsafeRunSync()
+      // TODO: action for fetching all unprocessed events from stream without committing them
+
       1 === 1 // temporarily
     }
 
     "provide Subscriber that skips over events ignored by processor PartialFunction" in {
+      // TODO: action for publishing events directly
+
+      // TODO: action for fetching all unprocessed events from stream without committing them
       1 === 1 // temporarily
     }
 
     "provide Subscriber that marks successfully processed events without any other action" in {
+      // TODO: action for publishing events directly
+
+      // TODO: action for fetching all unprocessed events from stream without committing them
       1 === 1 // temporarily
     }
 
     "provide Subscriber that pushes failed events to dead-letter queue" in {
+      // TODO: action for publishing events directly
+
+      // TODO: action for fetching all unprocessed events from stream without committing them
+
+      // TODO: action for fetching all unprocessed events from queue without deleting them
       1 === 1 // temporarily
     }
 
-    "provide Repairer that attempts to rerun event from dead-letter queue" in { 1 === 1 }
+    "provide Repairer that attempts to rerun event from dead-letter queue" in {
+      // TODO: action for publishing events to queue directly
+
+      // TODO: action for fetching all unprocessed events from queue without deleting them
+      1 === 1
+    }
   }
 }

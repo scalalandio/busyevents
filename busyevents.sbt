@@ -24,7 +24,8 @@ lazy val laws = project.from("laws")
   .setInitialImport()
   .configureModule
   .settings(
-    libraryDependencies += Dependencies.spec2Core
+    libraryDependencies += Dependencies.spec2Core,
+    libraryDependencies += Dependencies.spec2Scalacheck
   )
   .dependsOn(core)
 
@@ -89,8 +90,7 @@ lazy val awsSQS = project.from("aws-sqs")
   .configureModule
   .configureTests()
   .settings(
-    libraryDependencies += Dependencies.alpakkaSQS,
-    libraryDependencies += Dependencies.awsNioClient
+    libraryDependencies += Dependencies.alpakkaSQS
   )
   .compileAndTestDependsOn(awsCommon)
 

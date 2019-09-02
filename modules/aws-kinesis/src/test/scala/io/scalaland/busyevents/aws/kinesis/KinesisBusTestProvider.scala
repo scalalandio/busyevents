@@ -85,7 +85,7 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
 
   // test utilities
 
-  override def isSafeForPublishing(msgSizes: List[Long]): Boolean =
+  override def isSafeForPublishing(msgSizes: Seq[Long]): Boolean =
     (msgSizes.length <= 500L) && msgSizes.forall(_ <= (1024L * 1024L)) && (msgSizes.sum <= (5L * 1024L * 1024L))
   override def busPublishDirectly[F[_]: Async](envelope: List[BusEnvelope]): F[Unit] = Async[F].defer {
     client
@@ -118,5 +118,8 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
         .toScala
         .asAsync[F]
     } yield records.records().asScala.toList.map(r => KinesisEnvelope(r.partitionKey(), r.data().asByteBuffer(), None))
+  }
+  override def busMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
+    ().pure[F] // TODO: implement it for tests
   }
 }

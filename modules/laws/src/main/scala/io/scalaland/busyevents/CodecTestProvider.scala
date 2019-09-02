@@ -18,7 +18,6 @@ trait CodecTestProvider extends TestProvider {
   // test utilities
 
   implicit def event: Arbitrary[Event]
-  protected def events(size: Int): List[Event] =
-    Stream.continually(event.arbitrary.sample.toList).flatten.take(size).toList
+  protected def events: Stream[Event] = Stream.continually(event.arbitrary.sample.toList).flatten
   protected def eventSizeInBytes(event: Event): Long = encoder(event).array().length.toLong
 }

@@ -83,4 +83,7 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
       .asAsync[F]
       .map(_.messages().asScala.toList)
   }
+  override def dlqMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
+    ().pure[F] // TODO: implement it for tests
+  }
 }

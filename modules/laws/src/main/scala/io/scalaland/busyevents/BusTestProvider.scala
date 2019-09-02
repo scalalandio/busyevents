@@ -20,7 +20,8 @@ trait BusTestProvider extends TestProvider {
 
   // test utilities
 
-  def isSafeForPublishing(msgSizes: List[Long]): Boolean
+  def isSafeForPublishing(msgSizes: Seq[Long]): Boolean
   def busPublishDirectly[F[_]:           Async](events: List[BusEnvelope]): F[Unit]
   def busFetchNotProcessedDirectly[F[_]: Async](): F[List[BusEnvelope]]
+  def busMarkAllAsProcessed[F[_]:        Async]: F[Unit]
 }

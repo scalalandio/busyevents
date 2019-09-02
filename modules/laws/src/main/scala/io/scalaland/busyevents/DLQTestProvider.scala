@@ -21,4 +21,5 @@ trait DLQTestProvider extends TestProvider {
 
   def dlqPublishDirectly[F[_]:              Async](events: List[DLQEnvelope]): F[Unit]
   def dlqFetchTopNotProcessedDirectly[F[_]: Async](): F[List[DLQEnvelope]]
+  def dlqMarkAllAsProcessed[F[_]:           Async]: F[Unit]
 }

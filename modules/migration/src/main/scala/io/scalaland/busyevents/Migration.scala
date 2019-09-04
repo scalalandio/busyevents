@@ -9,12 +9,12 @@ import cats.implicits._
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-class Migration[OldEvent:       EventDecoder: EventEncoder,
-                OldBusEnvelope: Extractor,
-                OldDLQEnvelope,
-                NewEvent:       EventEncoder,
-                NewBusEnvelope: Enveloper,
-                NewDLQEnvelope](
+final class Migration[OldEvent:       EventDecoder: EventEncoder,
+                      OldBusEnvelope: Extractor,
+                      OldDLQEnvelope,
+                      NewEvent:       EventEncoder,
+                      NewBusEnvelope: Enveloper,
+                      NewDLQEnvelope](
   oldEventBus:     EventBus[OldEvent, OldBusEnvelope, OldDLQEnvelope],
   newEventBus:     EventBus[NewEvent, NewBusEnvelope, NewDLQEnvelope]
 )(implicit system: ActorSystem, materializer: ActorMaterializer, executionContext: ExecutionContext) {

@@ -58,19 +58,6 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
     deadLetterEnqueue,
     deadLetterDequeue
   )
-
-  // TODO: just an idea for now
-  def migrateTo[NewBusEnvelope, NewDLQEnvelope](eventBus: EventBus[Event, NewBusEnvelope, NewDLQEnvelope]): Unit =
-    migrateAdjustedTo(eventBus)(identity[Event])
-  def migrateAdjustedTo[NewEvent, NewBusEnvelope, NewDLQEnvelope](
-    eventBus: EventBus[NewEvent, NewBusEnvelope, NewDLQEnvelope]
-  )(
-    migration: Event => NewEvent
-  ): Unit = {
-    eventBus.hashCode()
-    migration.hashCode()
-    ()
-  }
 }
 
 object EventBus {

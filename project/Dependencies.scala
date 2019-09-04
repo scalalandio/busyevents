@@ -73,7 +73,11 @@ trait Dependencies {
 
     private val commonDir = "modules"
 
+    private val integrationDir = "integrations"
+
     def from(dir: String): Project = project in file(s"$commonDir/$dir")
+
+    def integration(dir: String): Project = project in file(s"$integrationDir/$dir")
   }
 
   implicit final class DependsOnProject(project: Project) {

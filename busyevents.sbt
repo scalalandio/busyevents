@@ -18,6 +18,13 @@ lazy val core = project.from("core")
     Seq(file)
   })
 
+lazy val migration = project.from("migration")
+  .setName("busyevents-migration")
+  .setDescription("Utility for migration from old bus to new bus")
+  .setInitialImport()
+  .configureModule
+  .dependsOn(core)
+
 lazy val laws = project.from("laws")
   .setName("busyevents-laws")
   .setDescription("Contracts that all combination of codec-bus-dql should hold")
@@ -27,11 +34,11 @@ lazy val laws = project.from("laws")
     libraryDependencies += Dependencies.spec2Core,
     libraryDependencies += Dependencies.spec2Scalacheck
   )
-  .dependsOn(core)
+  .dependsOn(core, migration)
 
 // encoders integrations
 
-lazy val jsonCirce = project.from("json-circe")
+lazy val jsonCirce = project.integration("json-circe")
   .setName("busyevents-circe")
   .setDescription("Turn Circe codecs into busyevents codecs")
   .setInitialImport("io.scalaland.busyevents.circe._")
@@ -46,7 +53,7 @@ lazy val jsonCirce = project.from("json-circe")
 
 // Apache integrations
 
-lazy val apacheKafka = project.from("apache-kafka")
+lazy val apacheKafka = project.integration("apache-kafka")
   .setName("busyevents-kafka")
   .setDescription("Use Apache Kafka as event bus")
   .setInitialImport("io.scalaland.busyevents.apache.kafka._")
@@ -59,7 +66,7 @@ lazy val apacheKafka = project.from("apache-kafka")
 
 // AWS integrations
 
-lazy val awsCommon = project.from("aws-common")
+lazy val awsCommon = project.integration("aws-common")
   .setName("busyevents-aws-common")
   .setDescription("Common AWs configs of all AWS integrations")
   .setInitialImport("io.scalaland.busyevents.aws._")
@@ -71,7 +78,7 @@ lazy val awsCommon = project.from("aws-common")
   )
   .dependsOn(core, laws % "test->compile")
 
-lazy val awsKinesis = project.from("aws-kinesis")
+lazy val awsKinesis = project.integration("aws-kinesis")
   .setName("busyevents-kinesis")
   .setDescription("Use AWS Kinesis as event bus")
   .setInitialImport("io.scalaland.busyevents.aws.kinesis._")
@@ -83,7 +90,7 @@ lazy val awsKinesis = project.from("aws-kinesis")
   )
   .compileAndTestDependsOn(awsCommon)
 
-lazy val awsSQS = project.from("aws-sqs")
+lazy val awsSQS = project.integration("aws-sqs")
   .setName("busyevents-sqs")
   .setDescription("Use AWS SQS as dead letter queue")
   .setInitialImport("io.scalaland.busyevents.aws.sqs._")

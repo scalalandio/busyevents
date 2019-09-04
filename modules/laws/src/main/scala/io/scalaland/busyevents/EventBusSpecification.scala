@@ -81,7 +81,7 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
 
     findUpperBound(1).map(searchN(1, _)).map(cache.take(_).toList)
   }
-  val safeToSend: List[Event] = knownSafeToSend.getOrElse(events.take(100).toList)
+  val safeToSend: List[Event] = knownSafeToSend.getOrElse(events.take(100).toList) // scalastyle:ignore
 
   def fetchAllUnprocessedFromBusAsEvents: List[Event] =
     Nested(busFetchNotProcessedDirectly[IO]()).map(busExtractor andThen decoder).value.unsafeRunSync().collect {
@@ -127,11 +127,15 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
       fetchAllUnprocessedFromBusAsEvents must not(beEmpty)
 
       // when
-      consumer.start[IO](PartialFunction.empty) // ignore all
+      val killSwitch = consumer.start[IO](PartialFunction.empty).value._2 // ignore all
 
       // then
-      fetchAllUnprocessedFromBusAsEvents must beEmpty[List[Event]].eventually
-      fetchAllUnprocessedFromDLQAsEvents must beEmpty
+      try {
+        fetchAllUnprocessedFromBusAsEvents must beEmpty[List[Event]].eventually
+        fetchAllUnprocessedFromDLQAsEvents must beEmpty
+      } finally {
+        killSwitch.shutdown()
+      }
     }
 
     "provide Subscriber that marks successfully processed events without any other action" in {
@@ -142,30 +146,75 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
       fetchAllUnprocessedFromBusAsEvents must not(beEmpty)
 
       // when
-      consumer.start[IO] {
-        case event => IO(processed += event)
-      }
+      val killSwitch = consumer
+        .start[IO] {
+          case event => IO(processed += event)
+        }
+        .value
+        ._2
 
       // then
-      fetchAllUnprocessedFromBusAsEvents must beEmpty[List[Event]].eventually
-      processed.toSet === safeToSend.toSet
-      fetchAllUnprocessedFromDLQAsEvents must beEmpty
+      try {
+        fetchAllUnprocessedFromBusAsEvents must beEmpty[List[Event]].eventually
+        processed.toSet === safeToSend.toSet
+        fetchAllUnprocessedFromDLQAsEvents must beEmpty
+      } finally {
+        killSwitch.shutdown()
+      }
     }
 
     "provide Subscriber that pushes failed events to dead-letter queue" in {
-      // TODO: action for publishing events directly
+      // given
+      publishEventsToBus(safeToSend)
 
-      // TODO: action for fetching all unprocessed events from stream without committing them
+      // when
+      val killSwitch = consumer
+        .start[IO] {
+          case _ => IO.raiseError(new Exception("Fail")) // fail all events
+        }
+        .value
+        ._2
 
-      // TODO: action for fetching all unprocessed events from queue without deleting them
-      1 === 1 // temporarily
+      // then
+      try {
+        fetchAllUnprocessedFromDLQAsEvents must beEqualTo(safeToSend).eventually
+      } finally {
+        killSwitch.shutdown()
+      }
     }
 
     "provide Repairer that attempts to rerun event from dead-letter queue" in {
-      // TODO: action for publishing events to queue directly
+      // given
+      @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
+      val processed = mutable.MutableList.empty[Event]
+      publishEventsToBus(safeToSend)
 
-      // TODO: action for fetching all unprocessed events from queue without deleting them
-      1 === 1
+      // when
+      val killSwitch1 = consumer
+        .start[IO] {
+          case _ => IO.raiseError(new Exception("Fail")) // fail all events
+        }
+        .value
+        ._2
+      try {
+        fetchAllUnprocessedFromDLQAsEvents must beEqualTo(safeToSend).eventually
+      } finally {
+        killSwitch1.shutdown()
+      }
+      val killSwitch2 = repairer
+        .start[IO] {
+          case event => IO(processed += event)
+        }
+        .value
+        ._2
+
+      // then
+      try {
+        fetchAllUnprocessedFromDLQAsEvents must beEmpty[List[Event]].eventually
+        processed.toSet === safeToSend.toSet
+      } finally {
+        killSwitch2.shutdown()
+      }
     }
   }
 }

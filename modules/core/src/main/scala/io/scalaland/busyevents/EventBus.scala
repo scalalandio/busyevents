@@ -24,6 +24,8 @@ class EventBus[Event, BusEnvelope, DLQEnvelope](
 
   // TODO: describe guarantees that each implementation should (and shouldn't) provide
 
+  // TODO: create an event scheduler, which would post events at specific moments in the future
+
   def publisher[F[_]: Async: Timer](implicit eventEncoder: EventEncoder[Event],
                                     enveloper: Enveloper[BusEnvelope],
                                     ec:        ExecutionContext): Publisher[F, BusEnvelope, Event] =

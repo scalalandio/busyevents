@@ -120,6 +120,21 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
     } yield records.records().asScala.toList.map(r => KinesisEnvelope(r.partitionKey(), r.data().asByteBuffer(), None))
   }
   override def busMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
-    ().pure[F] // TODO: implement it for tests
+    for {
+      shards <- client.listShards(ListShardsRequest.builder().streamName(streamName).build()).toScala.asAsync[F]
+      iterator <- client
+        .getShardIterator(
+          GetShardIteratorRequest.builder().streamName(streamName).shardId(shards.shards().get(0).shardId).build()
+        )
+        .toScala
+        .asAsync[F]
+      // TODO: check if that actually makes things treated as committed
+      _ <- iterator.shardIterator().tailRecM { it =>
+        client.getRecords(GetRecordsRequest.builder().shardIterator(it).limit(1000).build()).toScala.asAsync[F].map {
+          response =>
+            Option(response.nextShardIterator()).map(Left(_)).getOrElse(Right(()))
+        }
+      }
+    } yield ()
   }
 }

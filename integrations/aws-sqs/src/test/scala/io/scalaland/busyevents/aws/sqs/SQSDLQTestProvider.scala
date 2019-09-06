@@ -6,14 +6,7 @@ import cats.effect.{ Async, Resource, Sync }
 import cats.implicits._
 import io.scalaland.busyevents.utils.FutureToAsync
 import software.amazon.awssdk.core.SdkSystemSetting
-import software.amazon.awssdk.services.sqs.model.{
-  CreateQueueRequest,
-  DeleteQueueRequest,
-  Message,
-  ReceiveMessageRequest,
-  SendMessageBatchRequest,
-  SendMessageBatchRequestEntry
-}
+import software.amazon.awssdk.services.sqs.model.{ CreateQueueRequest, DeleteQueueRequest, Message, PurgeQueueRequest, ReceiveMessageRequest, SendMessageBatchRequest, SendMessageBatchRequestEntry }
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -84,6 +77,6 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
       .map(_.messages().asScala.toList)
   }
   override def dlqMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
-    ().pure[F] // TODO: implement it for tests
+    client.purgeQueue(PurgeQueueRequest.builder().queueUrl(sqsQueueUrl).build()).toScala.asAsync[F].void
   }
 }

@@ -15,4 +15,5 @@
   </root>
 
   <logger name="com.amazonaws" level="WARN" />
+  <logger name="event-bus" level="off" />
 </configuration>

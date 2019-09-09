@@ -20,9 +20,9 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
   /// name for specification descriptions
   override def dlqImplementationName = "SQS"
 
-  private def sqsEndpoint  = "http://0.0.0.0:4503/"
+  private def sqsEndpoint  = DockerServices.sqs
   private def sqsQueueName = s"sqs-dlq-$providerId"
-  private def sqsQueueUrl  = s"$sqsEndpoint/queue/dlqName"
+  private def sqsQueueUrl  = s"${sqsEndpoint}queue/$sqsQueueName"
   private def sqsConfig: ClientConfig[SqsAsyncClient] = testConfig(sqsEndpoint)
 
   /// type used in tests

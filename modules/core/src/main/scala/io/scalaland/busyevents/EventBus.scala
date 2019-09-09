@@ -88,7 +88,7 @@ object EventBus {
       implicit system: ActorSystem,
       materializer:    ActorMaterializer,
       ec:              ExecutionContext
-    ): Flow[EventError[Event], Unit, NotUsed]
+    ): Flow[ConsumerError[Event], Unit, NotUsed]
     def deadLetterEvents(
       implicit system: ActorSystem,
       materializer:    ActorMaterializer,

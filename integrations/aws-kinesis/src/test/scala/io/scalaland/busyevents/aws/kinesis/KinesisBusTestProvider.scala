@@ -13,9 +13,10 @@ import software.amazon.awssdk.services.kinesis.model.{
   DeleteStreamRequest,
   GetRecordsRequest,
   GetShardIteratorRequest,
-  ListShardsRequest,
   PutRecordsRequest,
-  PutRecordsRequestEntry
+  PutRecordsRequestEntry,
+  Record,
+  ShardIteratorType
 }
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
 
@@ -28,8 +29,8 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   /// name for specification descriptions
   override def busImplementationName = "Kinesis"
 
-  private def kinesisEndpoint = "http://0.0.0.0:4501/"
-  private def dynamoEndpoint  = "http://0.0.0.0:4502/"
+  private def kinesisEndpoint = DockerServices.kinesis
+  private def dynamoEndpoint  = DockerServices.dynamoDB
   private def appName         = s"kinesis-test-$providerId"
   private def streamName      = s"kinesis-bus-$providerId"
   private def dynamoTableName = s"kinesis-bus-check-$providerId"
@@ -106,35 +107,34 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   }
   override def busFetchNotProcessedDirectly[F[_]: Async](): F[List[BusEnvelope]] = Async[F].defer {
     for {
-      shards <- client.listShards(ListShardsRequest.builder().streamName(streamName).build()).toScala.asAsync[F]
+
+      firstShardId <- "shardId-000000000000".pure[F]
+      // apparently it doesn't work with kinesalite
+      //shards <- client.listShards(ListShardsRequest.builder().streamName(streamName).build()).toScala.asAsync[F]
+//      firstShardId <- if (shards.shards().isEmpty) Async[F].raiseError[String](new Exception("No shards!"))
+//      else shards.shards().get(0).shardId().pure[F]
       iterator <- client
         .getShardIterator(
-          GetShardIteratorRequest.builder().streamName(streamName).shardId(shards.shards().get(0).shardId()).build()
+          GetShardIteratorRequest
+            .builder()
+            .streamName(streamName)
+            .shardId(firstShardId)
+            .shardIteratorType(ShardIteratorType.TRIM_HORIZON)
+            .build()
         )
         .toScala
         .asAsync[F]
-      records <- client
-        .getRecords(GetRecordsRequest.builder().shardIterator(iterator.shardIterator()).build())
-        .toScala
-        .asAsync[F]
-    } yield records.records().asScala.toList.map(r => KinesisEnvelope(r.partitionKey(), r.data().asByteBuffer(), None))
-  }
-  override def busMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
-    for {
-      shards <- client.listShards(ListShardsRequest.builder().streamName(streamName).build()).toScala.asAsync[F]
-      iterator <- client
-        .getShardIterator(
-          GetShardIteratorRequest.builder().streamName(streamName).shardId(shards.shards().get(0).shardId).build()
-        )
-        .toScala
-        .asAsync[F]
-      // TODO: check if that actually makes things treated as committed
-      _ <- iterator.shardIterator().tailRecM { it =>
-        client.getRecords(GetRecordsRequest.builder().shardIterator(it).limit(1000).build()).toScala.asAsync[F].map {
-          response =>
-            Option(response.nextShardIterator()).map(Left(_)).getOrElse(Right(()))
-        }
+      records <- (List.empty[Record] -> Option(iterator.shardIterator())).tailRecM[F, List[Record]] {
+        case (list, Some(it)) =>
+          client.getRecords(GetRecordsRequest.builder().shardIterator(it).limit(1000).build()).toScala.asAsync[F].map {
+            response =>
+              val nextRecords = response.records.asScala.toList
+              ((list ++ nextRecords) -> Option(response.nextShardIterator()).filter(_ => nextRecords.nonEmpty))
+                .asLeft[List[Record]]
+          }
+        case (list, _) => list.asRight[(List[Record], Option[String])].pure[F]
       }
-    } yield ()
+    } yield records.map(r => KinesisEnvelope(r.partitionKey(), r.data().asByteBuffer(), None))
   }
+  override def busMarkAllAsProcessed[F[_]: Async]: F[Unit] = busFetchNotProcessedDirectly[F]().void
 }

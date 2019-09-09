@@ -29,16 +29,18 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
 
   protected def eventProcessing[F[_]: MonadError[?[_], Throwable]: RunToFuture](
     processor: PartialFunction[Event, F[Unit]]
-  ): Flow[Event, Either[EventError[Event], Unit], NotUsed] =
+  ): Flow[Event, Either[ConsumerError[Event], Unit], NotUsed] =
     Flow[Event].mapAsync(processorParallelism) { event: Event =>
-      RunToFuture[F].apply[Either[EventError[Event], Unit]](
+      RunToFuture[F].apply[Either[ConsumerError[Event], Unit]](
         processor
           .andThen(_.attempt.map {
-            _.leftMap(error => EventError.ProcessingError(error.getMessage, event, Some(error)): EventError[Event])
+            _.leftMap(
+              error => ConsumerError.ProcessingError(error.getMessage, event, Some(error)): ConsumerError[Event]
+            )
           })
-          .applyOrElse[Event, F[Either[EventError[Event], Unit]]](
+          .applyOrElse[Event, F[Either[ConsumerError[Event], Unit]]](
             event,
-            _ => ().asRight[EventError[Event]].pure[F]
+            _ => ().asRight[ConsumerError[Event]].pure[F]
           )
       )
     }
@@ -63,7 +65,7 @@ final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](
   config:              StreamConfig,
   log:                 Logger,
   unprocessedEvents:   (String, SharedKillSwitch) => Source[BusEnvelope, NotUsed],
-  deadLetterEnqueue:   Flow[EventError[Event], Unit, NotUsed],
+  deadLetterEnqueue:   Flow[ConsumerError[Event], Unit, NotUsed],
   commitEventConsumed: Sink[BusEnvelope, NotUsed]
 )(
   implicit system: ActorSystem,
@@ -84,12 +86,12 @@ final class Consumer[BusEnvelope: Extractor, Event: EventDecoder](
           case (EventDecodingResult.Success(event), envelope) =>
             Source.single[Event](event).via(processing).map(_ -> envelope)
           case (EventDecodingResult.Failure(message), envelope) =>
-            Source.single(Left(EventError.DecodingError(message, envelope)) -> envelope)
+            Source.single(Left(ConsumerError.DecodingError(message, envelope)) -> envelope)
           case (EventDecodingResult.Skipped, envelope) => Source.single(Right(()) -> envelope)
         }
       )
       .via(
-        Flow[Either[EventError[Event], Unit]]
+        Flow[Either[ConsumerError[Event], Unit]]
           .flatMapConcat {
             case Right(_)    => Source.single(())
             case Left(error) => Source.single(error).via(deadLetterEnqueue)
@@ -107,7 +109,7 @@ final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
   config:              StreamConfig,
   log:                 Logger,
   deadLetterEvents:    (String, SharedKillSwitch) => Source[DLQEnvelope, NotUsed],
-  requeueFailedEvents: Flow[EventError[Event], Unit, NotUsed],
+  requeueFailedEvents: Flow[ConsumerError[Event], Unit, NotUsed],
   deadLetterDequeue:   Sink[DLQEnvelope, NotUsed]
 )(
   implicit system: ActorSystem,
@@ -128,12 +130,14 @@ final class EventRepairer[DLQEnvelope: Extractor, Event: EventDecoder](
           case (EventDecodingResult.Success(event), envelope) =>
             Source.single[Event](event).via(processing).map(_ -> envelope)
           case (EventDecodingResult.Failure(message), envelope) =>
-            Source.single(Left(EventError.DecodingError(message, Extractor[DLQEnvelope].apply(envelope))) -> envelope)
+            Source.single(
+              Left(ConsumerError.DecodingError(message, Extractor[DLQEnvelope].apply(envelope))) -> envelope
+            )
           case (EventDecodingResult.Skipped, envelope) => Source.single(Right(()) -> envelope)
         }
       )
       .via(
-        Flow[Either[EventError[Event], Unit]]
+        Flow[Either[ConsumerError[Event], Unit]]
           .flatMapConcat {
             case Right(_)    => Source.single(())
             case Left(error) => Source.single(error).via(requeueFailedEvents)

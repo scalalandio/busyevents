@@ -31,14 +31,14 @@ class SQSDeadLetterQueueConfigurator(
     implicit system: ActorSystem,
     materializer:    ActorMaterializer,
     ec:              ExecutionContext
-  ): Flow[EventError[Event], Unit, NotUsed] = {
-    def enqueue(eventError: EventError[Event]): Source[Unit, NotUsed] =
+  ): Flow[ConsumerError[Event], Unit, NotUsed] = {
+    def enqueue(eventError: ConsumerError[Event]): Source[Unit, NotUsed] =
       Source.single[(SendMessageRequest, String)] {
         val encoded = new String(
           (eventError match {
-            case EventError.DecodingError(_, rawEvent) =>
+            case ConsumerError.DecodingError(_, rawEvent) =>
               rawEvent
-            case EventError.ProcessingError(_, event, _) =>
+            case ConsumerError.ProcessingError(_, event, _) =>
               EventEncoder[Event].apply(event)
           }).array,
           StandardCharsets.UTF_8
@@ -47,17 +47,17 @@ class SQSDeadLetterQueueConfigurator(
       } via SqsPublishFlow(queueUrl, sqsPublishSettings)(sqsAsyncClient).withContext[String] map {
         case (sent, encoded) =>
           eventError match {
-            case EventError.DecodingError(msg, _) =>
+            case ConsumerError.DecodingError(msg, _) =>
               log.error(s"Failed to decode event: '$encoded' due to error: $msg")
-            case EventError.ProcessingError(msg, _, None) =>
+            case ConsumerError.ProcessingError(msg, _, None) =>
               log.error(s"Failed to process event: '$encoded' due to error: $msg")
-            case EventError.ProcessingError(msg, _, Some(error)) =>
+            case ConsumerError.ProcessingError(msg, _, Some(error)) =>
               log.error(s"Failed to process event: '$encoded' due to error: $msg", error)
           }
           log.info(s"Message ${sent.result.messageId} enqueued on SQS")
       }
 
-    Flow[EventError[Event]].flatMapConcat(enqueue)
+    Flow[ConsumerError[Event]].flatMapConcat(enqueue)
   }
 
   override def deadLetterEvents(

@@ -16,6 +16,8 @@ import scala.concurrent.{ ExecutionContextExecutor, Future }
 trait EventBusSpecification extends Specification with BeforeAfterAll with AfterEach with TestProvider {
   self: CodecTestProvider with BusTestProvider with DLQTestProvider =>
 
+  sequential
+
   // initialization
 
   def implementationName: String =
@@ -137,7 +139,7 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
         publisher.publishEvents(unsafeEvents).unsafeRunSync() must throwA[Throwable]
 
         // then
-        fetchAllUnprocessedFromBusAsEvents must beEmpty
+        fetchAllUnprocessedFromBusAsEvents must beEmpty[List[Event]].eventually
       }
 
       // "sane" amount succeed
@@ -146,14 +148,13 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
       publisher.publishEvents(safeToSend).unsafeRunSync()
 
       // then
-      fetchAllUnprocessedFromBusAsEvents === safeToSend
+      fetchAllUnprocessedFromBusAsEvents must ===(safeToSend).eventually
     }
 
-    /*
     "provide Subscriber that skips over events ignored by processor PartialFunction" in {
       // given
       publishEventsToBus(safeToSend)
-      fetchAllUnprocessedFromBusAsEvents must not(beEmpty)
+      fetchAllUnprocessedFromBusAsEvents must not(beEmpty[List[Event]]).eventually
 
       // when
       val killSwitch = consumer.start[IO](PartialFunction.empty).value._2 // ignore all
@@ -161,12 +162,13 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
       // then
       try {
         fetchAllUnprocessedFromBusAsEvents must beEmpty[List[Event]].eventually
-        fetchAllUnprocessedFromDLQAsEvents must beEmpty
+        fetchAllUnprocessedFromDLQAsEvents must beEmpty[List[Event]].eventually
       } finally {
         killSwitch.shutdown()
       }
     }
 
+    /*
     "provide Subscriber that marks successfully processed events without any other action" in {
       // given
       @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))

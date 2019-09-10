@@ -20,7 +20,7 @@ trait CirceTestProvider extends CodecTestProvider {
 
   override implicit def event: Arbitrary[CirceTest] = Arbitrary(
     for {
-      s <- Gen.asciiStr
+      s <- Gen.alphaNumStr
       i <- Gen.size
       d <- Gen.size.map(_.toDouble)
     } yield CirceTest(s, i, d)

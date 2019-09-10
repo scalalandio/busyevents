@@ -6,7 +6,15 @@ import cats.effect.{ Async, Resource, Sync }
 import cats.implicits._
 import io.scalaland.busyevents.utils.FutureToAsync
 import software.amazon.awssdk.core.SdkSystemSetting
-import software.amazon.awssdk.services.sqs.model.{ CreateQueueRequest, DeleteQueueRequest, Message, PurgeQueueRequest, ReceiveMessageRequest, SendMessageBatchRequest, SendMessageBatchRequestEntry }
+import software.amazon.awssdk.services.sqs.model.{
+  CreateQueueRequest,
+  DeleteQueueRequest,
+  Message,
+  PurgeQueueRequest,
+  ReceiveMessageRequest,
+  SendMessageBatchRequest,
+  SendMessageBatchRequestEntry
+}
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -40,12 +40,12 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
 
   override def dlqExtractor: Extractor[DLQEnvelope] = sqsExtractor
 
-  private var client: SqsAsyncClient = _
+  private var sqsAsyncClient: SqsAsyncClient = _
   override def dlqEnvironment[F[_]: Async]: Resource[F, Unit] = {
     val sqsQueue = AWSResources
       .sqs[F](sqsConfig)
       .map { sqs =>
-        client = sqs
+        sqsAsyncClient = sqs
         sqs
       }
       .flatMap { sqs =>
@@ -63,7 +63,7 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
   // test utilities
 
   override def dlqPublishDirectly[F[_]: Async](events: List[DLQEnvelope]): F[Unit] = Async[F].defer {
-    client
+    sqsAsyncClient
       .sendMessageBatch(
         SendMessageBatchRequest
           .builder()
@@ -78,13 +78,13 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
       .void
   }
   override def dlqFetchTopNotProcessedDirectly[F[_]: Async](): F[List[DLQEnvelope]] = Async[F].defer {
-    client
+    sqsAsyncClient
       .receiveMessage(ReceiveMessageRequest.builder().queueUrl(sqsQueueUrl).maxNumberOfMessages(10).build())
       .toScala
       .asAsync[F]
       .map(_.messages().asScala.toList)
   }
   override def dlqMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
-    client.purgeQueue(PurgeQueueRequest.builder().queueUrl(sqsQueueUrl).build()).toScala.asAsync[F].void
+    sqsAsyncClient.purgeQueue(PurgeQueueRequest.builder().queueUrl(sqsQueueUrl).build()).toScala.asAsync[F].void
   }
 }

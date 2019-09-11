@@ -156,22 +156,25 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
       }
   }
 
-  override def busEnvironment[F[_]: Async]: Resource[F, Unit] =
-    scheduler[F].flatMap { s =>
-      Resource.make[F, Unit] {
-        new Thread(s).start()
-        10.tailRecM[F, Unit] { countdown: Int =>
-          if (initialized) ().asRight[Int].pure[F]
-          else if (countdown >= 0 && !initialized)
-            Async[F].defer {
-              Thread.sleep(100)
-              (countdown - 1).asLeft[Unit].pure[F]
-            } else Async[F].raiseError(new Exception("Unable to initialize scheduler thread"))
-        }
-      } { _ =>
-        Async[F].unit
+  private def consumerThread[F[_]: Async] = scheduler[F].flatMap { s =>
+    Resource.make[F, Thread] {
+      val schedulerThread = new Thread(s)
+      schedulerThread.setDaemon(true)
+      schedulerThread.start()
+      10.tailRecM[F, Thread] { countdown: Int =>
+        if (initialized) schedulerThread.asRight[Int].pure[F]
+        else if (countdown >= 0 && !initialized)
+          Async[F].defer {
+            Thread.sleep(100)
+            (countdown - 1).asLeft[Thread].pure[F]
+          } else Async[F].raiseError(new Exception("Unable to initialize scheduler thread"))
       }
+    } { schedulerThread =>
+      Async[F].delay(schedulerThread.interrupt())
     }
+  }
+
+  override def busEnvironment[F[_]:  Async]: Resource[F, Unit] = consumerThread[F].void
   override def busConfigurator[F[_]: Sync]: Resource[F, EventBus.BusConfigurator[KinesisEnvelope]] =
     (
       AWSResources.kinesis[F](kinesisConfig),

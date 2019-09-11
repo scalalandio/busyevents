@@ -14,8 +14,8 @@ object Dependencies {
   // libraries versions
   val akkaVersion       = "2.5.25"
   val awsSdkVersion     = "2.5.65"
-  val catsVersion       = "1.6.0"
-  val catsEffectVersion = "1.4.0"
+  val catsVersion       = "2.0.0"
+  val catsEffectVersion = "2.0.0"
   val circeVersion      = "0.11.1"
   val specs2Version     = "4.6.0"
 

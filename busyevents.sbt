@@ -5,7 +5,7 @@ lazy val root = project.root
   .setName("busyevents")
   .setDescription("BusyEvents build script")
   .configureRoot
-  .aggregate(core, laws, jsonCirce, apacheKafka, awsCommon, awsKinesis, awsSQS, tests)
+  .aggregate(core, laws, jsonCirce, awsCommon, awsKinesis, awsSQS, tests)
 
 lazy val core = project.from("core")
   .setName("busyevents-core")
@@ -48,19 +48,6 @@ lazy val jsonCirce = project.integration("json-circe")
     libraryDependencies += Dependencies.circe,
     libraryDependencies += Dependencies.circeParser,
     libraryDependencies += Dependencies.circeGeneric % Test
-  )
-  .dependsOn(core, laws % "test->compile")
-
-// Apache integrations
-
-lazy val apacheKafka = project.integration("apache-kafka")
-  .setName("busyevents-kafka")
-  .setDescription("Use Apache Kafka as event bus")
-  .setInitialImport("io.scalaland.busyevents.apache.kafka._")
-  .configureModule
-  .configureTests()
-  .settings(
-    libraryDependencies += Dependencies.alpakkaKafka
   )
   .dependsOn(core, laws % "test->compile")
 
@@ -113,7 +100,7 @@ lazy val tests = project.from("tests")
     libraryDependencies += Dependencies.logback
   )
   .dependsOn(core, laws % "test->compile")
-  .compileAndTestDependsOn(jsonCirce, apacheKafka, awsKinesis, awsSQS)
+  .compileAndTestDependsOn(jsonCirce, awsKinesis, awsSQS)
 
 addCommandAlias("fullTest", ";test;scalastyle")
 addCommandAlias("fullCoverageTest", ";coverage;test;coverageReport;coverageAggregate;scalastyle")

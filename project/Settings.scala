@@ -5,9 +5,7 @@ import sbt.Tests.Argument
 import com.typesafe.sbt._
 import com.lucidchart.sbt.scalafmt.ScalafmtCorePlugin.autoImport._
 import org.scalastyle.sbt.ScalastylePlugin.autoImport._
-import sbtassembly.AssemblyPlugin.autoImport._
 import scoverage._
-import spray.revolver.RevolverPlugin.autoImport._
 import wartremover._
 
 object Settings extends Dependencies {
@@ -136,13 +134,6 @@ object Settings extends Dependencies {
   implicit final class RunConfigurator(project: Project) {
 
     def configureRun(main: String): Project = project
-      .settings(inTask(assembly)(Seq(
-        assemblyJarName := s"${name.value}.jar",
-        assemblyMergeStrategy := {
-          case strategy => MergeStrategy.defaultMergeStrategy(strategy)
-        },
-        mainClass := Some(main)
-      )))
       .settings(Compile / run / mainClass := Some(main))
   }
 

@@ -6,7 +6,7 @@ object Dependencies {
 
   // scala version
   val scalaOrganization = "org.scala-lang"
-  val scalaVersion      = "2.12.9"
+  val scalaVersion      = "2.12.10"
 
   // build tools version
   val scalaFmtVersion = "1.5.1"
@@ -16,7 +16,7 @@ object Dependencies {
   val awsSdkVersion     = "2.5.65"
   val catsVersion       = "2.0.0"
   val catsEffectVersion = "2.0.0"
-  val circeVersion      = "0.11.1"
+  val circeVersion      = "0.12.1"
   val specs2Version     = "4.6.0"
 
   // resolvers

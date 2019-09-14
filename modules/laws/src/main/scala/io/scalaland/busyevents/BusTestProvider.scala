@@ -1,6 +1,6 @@
 package io.scalaland.busyevents
 
-import cats.effect.{ Async, Resource, Sync }
+import cats.effect.{ Async, Resource, Sync, Timer }
 
 trait BusTestProvider extends TestProvider {
 
@@ -15,8 +15,8 @@ trait BusTestProvider extends TestProvider {
   implicit def busEnveloper: Enveloper[BusEnvelope]
   implicit def busExtractor: Extractor[BusEnvelope]
 
-  def busEnvironment[F[_]:  Async]: Resource[F, Unit]
-  def busConfigurator[F[_]: Sync]:  Resource[F, EventBus.BusConfigurator[BusEnvelope]]
+  def busEnvironment[F[_]:  Async: Timer]: Resource[F, Unit]
+  def busConfigurator[F[_]: Sync]: Resource[F, EventBus.BusConfigurator[BusEnvelope]]
 
   // test utilities
 

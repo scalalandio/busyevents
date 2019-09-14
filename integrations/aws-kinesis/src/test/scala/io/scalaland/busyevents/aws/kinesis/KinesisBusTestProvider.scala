@@ -2,7 +2,7 @@ package io.scalaland.busyevents
 package aws
 package kinesis
 
-import cats.effect.{ Async, Resource, Sync }
+import cats.effect.{ Async, Resource, Sync, Timer }
 import cats.implicits._
 import io.scalaland.busyevents.utils.FutureToAsync
 import software.amazon.awssdk.core.SdkBytes
@@ -29,6 +29,7 @@ import software.amazon.kinesis.processor.ShardRecordProcessor
 import software.amazon.kinesis.retrieval.polling.PollingConfig
 import software.amazon.kinesis.retrieval.{ KinesisClientRecord, RetrievalConfig }
 
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters._
@@ -156,19 +157,16 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
       }
   }
 
-  private def consumerThread[F[_]: Async] = scheduler[F].flatMap { s =>
+  private def consumerThread[F[_]: Async: Timer] = scheduler[F].flatMap { s =>
     loggedResource("Kinesis Consumer thread") {
       val schedulerThread = new Thread(s)
       schedulerThread.setDaemon(true)
       schedulerThread.start()
-      s.run()
       10.tailRecM[F, Thread] { countdown: Int =>
+        log.info("attempt to wait for thread")
         if (initialized) schedulerThread.asRight[Int].pure[F]
-        else if (countdown >= 0 && !initialized)
-          Async[F].defer {
-            Thread.sleep(1000)
-            (countdown - 1).asLeft[Thread].pure[F]
-          } else
+        else if (countdown >= 0 && !initialized) (Timer[F].sleep(1.second) *> (countdown - 1).asLeft[Thread].pure[F])
+        else
           Sync[F].delay(schedulerThread.interrupt()) *>
             new Exception("Unable to initialize scheduler thread").raiseError[F, Either[Int, Thread]]
       }
@@ -177,7 +175,7 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
     }
   }
 
-  override def busEnvironment[F[_]:  Async]: Resource[F, Unit] = consumerThread[F].void
+  override def busEnvironment[F[_]:  Async: Timer]: Resource[F, Unit] = consumerThread[F].void
   override def busConfigurator[F[_]: Sync]: Resource[F, EventBus.BusConfigurator[KinesisEnvelope]] =
     loggedResourceFrom("KinesisBusConfigurator") {
       (

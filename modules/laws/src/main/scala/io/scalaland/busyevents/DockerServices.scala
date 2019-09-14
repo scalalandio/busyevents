@@ -6,8 +6,8 @@ object DockerServices {
 
   // scalastyle:off
   // keep in sync with docker-compose.yml
-  val kinesis:  String = serviceAt(4501)
-  val dynamoDB: String = serviceAt(4502)
-  val sqs:      String = serviceAt(4503)
+  val kinesis:  String = serviceAt(4568)
+  val dynamoDB: String = serviceAt(4569)
+  val sqs:      String = serviceAt(4576)
   // scalastyle:on
 }

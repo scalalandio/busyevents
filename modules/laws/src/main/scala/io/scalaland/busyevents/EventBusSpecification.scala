@@ -3,13 +3,15 @@ package io.scalaland.busyevents
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import cats.data.Nested
-import cats.effect.{ IO, Timer }
+import cats.effect._
 import cats.implicits.{ catsSyntaxEq => _, _ }
 import com.typesafe.scalalogging.Logger
 import org.specs2.mutable.Specification
 import org.specs2.specification.{ AfterEach, BeforeAfterAll }
 
-//import scala.collection.mutable
+import scala.concurrent.ExecutionContext
+
+import scala.collection.mutable
 import scala.concurrent.{ ExecutionContextExecutor, Future }
 
 @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -85,6 +87,8 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
 
   // utilities
 
+  implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+
   implicit val runToFuture: RunToFuture[IO] = new RunToFuture[IO] {
     override def apply[A](fa: IO[A]): Future[A] = fa.unsafeToFuture()
   }
@@ -129,7 +133,6 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
 
   s"$codecImplementationName encoder with $busImplementationName bus with $dlqImplementationName DLQ" should {
 
-    /*
     "provide Publisher that sends all events in batch or none" in {
       // too many events fail
       knownSafeToSend.map(_.length).foreach { safeSize =>
@@ -247,8 +250,5 @@ trait EventBusSpecification extends Specification with BeforeAfterAll with After
         killSwitch2.shutdown()
       }
     }
-     */
-
-    1 === 1
   }
 }

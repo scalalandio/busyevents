@@ -10,7 +10,7 @@ object AWSResources {
   private[aws] def resource[F[_]: Sync, A <: SdkClient](thunk: => A): Resource[F, A] =
     Resource.fromAutoCloseable[F, A](
       Sync[F].delay(thunk).recoverWith {
-        case ex: Throwable => Sync[F].raiseError(new Exception("Error during AWS client initialization", ex))
+        case ex: Throwable => new Exception("Error during AWS client initialization", ex).raiseError[F, A]
       }
     )
 }

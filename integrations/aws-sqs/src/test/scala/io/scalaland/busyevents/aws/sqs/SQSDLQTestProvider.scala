@@ -2,7 +2,7 @@ package io.scalaland.busyevents
 package aws
 package sqs
 
-import cats.effect.{ Async, Resource, Sync }
+import cats.effect.{ Async, Resource, Sync, Timer }
 import cats.implicits._
 import io.scalaland.busyevents.utils.FutureToAsync
 import software.amazon.awssdk.core.SdkSystemSetting
@@ -41,7 +41,7 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
   override def dlqExtractor: Extractor[DLQEnvelope] = sqsExtractor
 
   private var sqsAsyncClient: SqsAsyncClient = _
-  override def dlqEnvironment[F[_]: Async]: Resource[F, Unit] = {
+  override def dlqEnvironment[F[_]: Async: Timer]: Resource[F, Unit] = {
     val sqsQueue = loggedResourceFrom(s"SqsAsyncClient to $sqsEndpoint")(AWSResources.sqs[F](sqsConfig))
       .map { sqs =>
         sqsAsyncClient = sqs

@@ -6,23 +6,12 @@ networks:
 
 services:
 
-  kinesis:
-    image: dlsniper/kinesalite:latest
+  localstack:
+    image: localstack/localstack
+    environment:
+      - KINESIS_LATENCY=0
     networks:
       - busyevents
     ports:
-      - 4501:4567
-
-  dynamodb:
-    image: dlsniper/dynalite:latest
-    networks:
-      - busyevents
-    ports:
-      - 4502:4567
-
-  sqs:
-    image: softwaremill/elasticmq:latest
-    networks:
-      - busyevents
-    ports:
-      - 4503:9324
+      - "4567-4584:4567-4584"
+      - "${PORT_WEB_UI-8080}:${PORT_WEB_UI-8080}"

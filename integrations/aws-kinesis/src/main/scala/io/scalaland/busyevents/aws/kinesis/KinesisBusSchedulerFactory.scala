@@ -1,15 +1,17 @@
 package io.scalaland.busyevents.aws.kinesis
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.Sink
+import java.util.UUID
+
 import akka.NotUsed
+import akka.actor.{ ActorRef, ActorSystem }
 import akka.event.LoggingAdapter
 import akka.stream.{ ActorMaterializer, SharedKillSwitch }
+import akka.stream.scaladsl.Sink
 import cats.effect.{ Resource, Sync }
 import cats.implicits._
 import com.typesafe.scalalogging.Logger
 import px.kinesis.stream.consumer.{ Record, RecordProcessorFactoryImpl }
-import px.kinesis.stream.consumer.checkpoint.{ CheckpointConfig, CheckpointTracker }
+import px.kinesis.stream.consumer.checkpoint.{ CheckpointConfig, CheckpointTracker, CheckpointTrackerActor }
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
@@ -38,6 +40,8 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
   ): Resource[F, Scheduler] = Resource[F, Scheduler](
     Sync[F]
       .delay {
+        val uniqueWorkerID = s"$workerId-${UUID.randomUUID()}"
+
         val schedulerConfig =
           new ConfigsBuilder(
             kinesisStreamName,
@@ -45,8 +49,8 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
             kinesisAsyncClient,
             dynamoDbAsyncClient,
             cloudWatchAsyncClient,
-            workerId,
-            recordProcessorFactory(workerId, killSwitch, publishSink)
+            uniqueWorkerID,
+            recordProcessorFactory(uniqueWorkerID, killSwitch, publishSink)
           ).tableName(dynamoTableName)
 
         val pollingConfig: PollingConfig =
@@ -95,5 +99,26 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
     materializer:                                   ActorMaterializer,
     ec:                                             ExecutionContext
   ): RecordProcessorFactoryImpl =
-    new RecordProcessorFactoryImpl(publishSink, workerId, CheckpointTracker(workerId, checkpointConfig), killSwitch)
+    new RecordProcessorFactoryImpl(
+      publishSink,
+      workerId,
+      new CheckpointTracker(
+        UUID.randomUUID().toString, // prevent actor name [...] is not unique! (see below)
+        checkpointConfig.maxBufferSize,
+        checkpointConfig.maxDurationInSeconds,
+        checkpointConfig.completionTimeout,
+        checkpointConfig.timeout
+      ) {
+
+        override val tracker: ActorRef = {
+          system.actorOf(
+            CheckpointTrackerActor.props(workerId,
+                                         checkpointConfig.maxBufferSize,
+                                         checkpointConfig.maxDurationInSeconds),
+            s"tracker-$workerId" // name = s"tracker-${workerId.take(5)}" causes A LOT of issues
+          )
+        }
+      },
+      killSwitch
+    )
 }

@@ -46,7 +46,7 @@
  </check>
  <check level="error" class="org.scalastyle.scalariform.MagicNumberChecker" enabled="false">
   <parameters>
-   <parameter name="ignore"><![CDATA[-1,0,1,2,3,200,201,400,401,403,404]]></parameter>
+   <parameter name="ignore"><![CDATA[-1,0,1,2,3,200,201,400,401,403,404,500]]></parameter>
   </parameters>
  </check>
  <check level="error" class="org.scalastyle.scalariform.MethodLengthChecker" enabled="true">

@@ -33,15 +33,26 @@ sealed abstract class Processor[Envelope: Extractor, Event: EventDecoder](config
     Flow[Event].mapAsync(processorParallelism) { event: Event =>
       RunToFuture[F].apply[Either[ConsumerError[Event], Unit]](
         processor
-          .andThen(_.attempt.map {
-            _.leftMap(
-              error => ConsumerError.ProcessingError(error.getMessage, event, Some(error)): ConsumerError[Event]
-            )
-          })
+          .andThen(
+            _.attempt.map {
+              _.map(_ => log.warn(s"Event processed: $event")).leftMap(
+                error => ConsumerError.ProcessingError(error.getMessage, event, Some(error)): ConsumerError[Event]
+              )
+            }
+          )
           .applyOrElse[Event, F[Either[ConsumerError[Event], Unit]]](
             event,
-            _ => ().asRight[ConsumerError[Event]].pure[F]
+            _ => log.warn(s"Event skipped: $event").asRight[ConsumerError[Event]].pure[F]
           )
+          .flatTap {
+            case Left(ConsumerError.DecodingError(message, _)) =>
+              log.error(s"Error during decoding: $message for event: $event").pure[F]
+            case Left(ConsumerError.ProcessingError(message, _, None)) =>
+              log.error(s"Error during processing: $message for event: $event").pure[F]
+            case Left(ConsumerError.ProcessingError(message, _, Some(error))) =>
+              log.error(s"Error during processing: $message for event: $event", error).pure[F]
+            case Right(_) => ().pure[F]
+          }
       )
     }
 

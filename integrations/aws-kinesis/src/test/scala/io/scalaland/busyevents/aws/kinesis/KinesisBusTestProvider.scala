@@ -108,13 +108,20 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   private class TestRecordProcessor extends ShardRecordProcessor {
     override def initialize(initializationInput: InitializationInput) =
       initialized = true
-    override def processRecords(processRecordsInput: ProcessRecordsInput) =
+    override def processRecords(processRecordsInput: ProcessRecordsInput) = {
       fetchedRecords = fetchedRecords ++ processRecordsInput.records().asScala
-    override def leaseLost(leaseLostInput:   LeaseLostInput) = ()
-    override def shardEnded(shardEndedInput: ShardEndedInput) =
+      log.info(s"fetched records: ${fetchedRecords.size}")
+    }
+    override def leaseLost(leaseLostInput: LeaseLostInput) =
+      log.warn(s"Lease wast stolen")
+    override def shardEnded(shardEndedInput: ShardEndedInput) = {
       shardEndedInput.checkpointer.checkpoint()
-    override def shutdownRequested(shutdownRequestedInput: ShutdownRequestedInput) =
+      log.warn(s"Lease wast stolen")
+    }
+    override def shutdownRequested(shutdownRequestedInput: ShutdownRequestedInput) = {
       shutdownRequestedInput.checkpointer.checkpoint()
+      log.warn(s"Processor shutdown requested")
+    }
   }
 
   private def scheduler[F[_]: Async] = (kinesisResource[F], dynamoDBResource[F], cloudwatchResource[F]).tupled.flatMap {
@@ -163,7 +170,6 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
       schedulerThread.setDaemon(true)
       schedulerThread.start()
       10.tailRecM[F, Thread] { countdown: Int =>
-        log.info("attempt to wait for thread")
         if (initialized) schedulerThread.asRight[Int].pure[F]
         else if (countdown >= 0 && !initialized) (Timer[F].sleep(1.second) *> (countdown - 1).asLeft[Thread].pure[F])
         else
@@ -206,10 +212,13 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
         .toScala
         .asAsync[F]
     }.void
+  // TODO: this is a bug as we have 2 schedulers rivaling for resources
+  // TODO: this has to be rewritten so that we use some low level API
   override def busFetchNotProcessedDirectly[F[_]: Async](): F[List[BusEnvelope]] = Async[F].delay {
     fetchedRecords.map(r => KinesisEnvelope(r.partitionKey(), r.data(), None))
   }
   override def busMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].delay {
+    log.error("cleanup of fetched records")
     fetchedRecords = List.empty
   }
 }

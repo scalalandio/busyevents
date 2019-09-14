@@ -51,7 +51,7 @@ class Retry(maxRetries: Int, minBackoff: FiniteDuration, maxBackoff: FiniteDurat
         case error =>
           Sync[F].defer {
             beforeAbort(error)
-            Sync[F].raiseError(error)
+            error.raiseError[F, Either[State, A]]
           }
       }
     }

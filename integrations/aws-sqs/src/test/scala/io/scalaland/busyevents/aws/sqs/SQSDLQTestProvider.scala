@@ -42,7 +42,7 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
 
   private var sqsAsyncClient: SqsAsyncClient = _
   override def dlqEnvironment[F[_]: Async]: Resource[F, Unit] = {
-    val sqsQueue = loggedResourceFrom("SqsAsyncClient")(AWSResources.sqs[F](sqsConfig))
+    val sqsQueue = loggedResourceFrom(s"SqsAsyncClient to $sqsEndpoint")(AWSResources.sqs[F](sqsConfig))
       .map { sqs =>
         sqsAsyncClient = sqs
         sqs
@@ -58,27 +58,27 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
   }
   override def dlqConfigurator[F[_]: Sync]: Resource[F, EventBus.DeadLetterQueueConfigurator[Message]] =
     loggedResourceFrom("SQSDeadLetterQueueConfigurator") {
-      loggedResourceFrom("SqsAsyncClient2")(AWSResources.sqs[F](sqsConfig))
+      loggedResourceFrom(s"SqsAsyncClient2 to $sqsEndpoint")(AWSResources.sqs[F](sqsConfig))
         .map(SQSDeadLetterQueueConfigurator(SQSDeadLetterQueueConfig(sqsQueueUrl), log))
     }
 
   // test utilities
 
-  override def dlqPublishDirectly[F[_]: Async](events: List[DLQEnvelope]): F[Unit] = Async[F].defer {
-    sqsAsyncClient
-      .sendMessageBatch(
-        SendMessageBatchRequest
-          .builder()
-          .queueUrl(sqsQueueUrl)
-          .entries(
-            events.map(e => SendMessageBatchRequestEntry.builder().messageBody(e.body()).build()).asJavaCollection
-          )
-          .build()
-      )
-      .toScala
-      .asAsync[F]
-      .void
-  }
+  override def dlqPublishDirectly[F[_]: Async](events: List[DLQEnvelope]): F[Unit] =
+    Async[F].defer {
+      sqsAsyncClient
+        .sendMessageBatch(
+          SendMessageBatchRequest
+            .builder()
+            .queueUrl(sqsQueueUrl)
+            .entries(
+              events.map(e => SendMessageBatchRequestEntry.builder().messageBody(e.body()).build()).asJavaCollection
+            )
+            .build()
+        )
+        .toScala
+        .asAsync[F]
+    }.void
   override def dlqFetchTopNotProcessedDirectly[F[_]: Async](): F[List[DLQEnvelope]] = Async[F].defer {
     sqsAsyncClient
       .receiveMessage(ReceiveMessageRequest.builder().queueUrl(sqsQueueUrl).maxNumberOfMessages(10).build())
@@ -86,7 +86,8 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
       .asAsync[F]
       .map(_.messages().asScala.toList)
   }
-  override def dlqMarkAllAsProcessed[F[_]: Async]: F[Unit] = Async[F].defer {
-    sqsAsyncClient.purgeQueue(PurgeQueueRequest.builder().queueUrl(sqsQueueUrl).build()).toScala.asAsync[F].void
-  }
+  override def dlqMarkAllAsProcessed[F[_]: Async]: F[Unit] =
+    Async[F].defer {
+      sqsAsyncClient.purgeQueue(PurgeQueueRequest.builder().queueUrl(sqsQueueUrl).build()).toScala.asAsync[F]
+    }.void
 }

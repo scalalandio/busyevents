@@ -17,5 +17,5 @@
   <logger name="com.amazonaws" level="off" />
   <logger name="software.amazon" level="off" />
   <logger name="software.amazon.kinesis.coordinator.Scheduler" level="WARN" />
-  <logger name="event-bus" level="ERROR" />
+  <logger name="event-bus" level="DEBUG" />
 </configuration>

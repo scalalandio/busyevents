@@ -14,9 +14,9 @@ trait TestProvider {
 
   protected def loggedResource[F[_]: Sync, A](
     resourceName: String
-  )(acquire:      F[A])(release: A => F[Unit]): Resource[F, A] =
+  )(acquire:      => F[A])(release: A => F[Unit]): Resource[F, A] =
     Resource.make {
-      (Sync[F].delay(log.debug(s"Acquiring resource: $resourceName")) *> acquire <*
+      (Sync[F].delay(log.debug(s"Acquiring resource: $resourceName")) *> Sync[F].defer(acquire) <*
         Sync[F].delay(log.debug(s"Acquired resource: $resourceName"))).handleErrorWith { error =>
         Sync[F].delay(log.error(s"Failed to acquire resource $resourceName", error)) *> error.raiseError[F, A]
       }

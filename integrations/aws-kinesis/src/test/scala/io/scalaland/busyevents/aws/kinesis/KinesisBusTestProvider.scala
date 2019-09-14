@@ -60,7 +60,7 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   private var fetchedRecords:     List[KinesisClientRecord] = List.empty[KinesisClientRecord]
 
   private def kinesisResource[F[_]: Async] =
-    loggedResourceFrom("KinesisAsyncClient")(AWSResources.kinesis[F](kinesisConfig))
+    loggedResourceFrom(s"KinesisAsyncClient to $kinesisEndpoint")(AWSResources.kinesis[F](kinesisConfig))
       .map { kinesis =>
         kinesisAsyncClient = kinesis
         kinesis
@@ -81,7 +81,7 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
       }
 
   private def dynamoDBResource[F[_]: Async] =
-    loggedResourceFrom("DynamoDbAsyncClient")(AWSResources.dynamo[F](dynamoConfig))
+    loggedResourceFrom(s"DynamoDbAsyncClient to $dynamoEndpoint")(AWSResources.dynamo[F](dynamoConfig))
       .flatTap { dynamo =>
         loggedResource(s"DynamoDB table '$dynamoTableName'") {
           ().pure[F] // table is created by a consumer thread
@@ -161,7 +161,8 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
       val schedulerThread = new Thread(s)
       schedulerThread.setDaemon(true)
       schedulerThread.start()
-      30.tailRecM[F, Thread] { countdown: Int =>
+      s.run()
+      10.tailRecM[F, Thread] { countdown: Int =>
         if (initialized) schedulerThread.asRight[Int].pure[F]
         else if (countdown >= 0 && !initialized)
           Async[F].defer {
@@ -180,8 +181,8 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   override def busConfigurator[F[_]: Sync]: Resource[F, EventBus.BusConfigurator[KinesisEnvelope]] =
     loggedResourceFrom("KinesisBusConfigurator") {
       (
-        loggedResourceFrom("KinesisAsyncClient2")(AWSResources.kinesis[F](kinesisConfig)),
-        loggedResourceFrom("DynamoDBAsyncClient2")(AWSResources.dynamo[F](dynamoConfig)),
+        loggedResourceFrom(s"KinesisAsyncClient2 to $kinesisEndpoint")(AWSResources.kinesis[F](kinesisConfig)),
+        loggedResourceFrom(s"DynamoDBAsyncClient2 to $dynamoEndpoint")(AWSResources.dynamo[F](dynamoConfig)),
         loggedResourceFrom("CloudWatchAsyncClient2")(AWSResources.cloudWatch[F]())
       ).mapN(KinesisBusConfigurator(KinesisBusConfig(appName, streamName, dynamoTableName), log))
     }
@@ -190,23 +191,23 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
 
   override def isSafeForPublishing(msgSizes: Seq[Long]): Boolean =
     (msgSizes.length <= 500L) && msgSizes.forall(_ <= (1024L * 1024L)) && (msgSizes.sum <= (5L * 1024L * 1024L))
-  override def busPublishDirectly[F[_]: Async](envelope: List[BusEnvelope]): F[Unit] = Async[F].defer {
-    kinesisAsyncClient
-      .putRecords(
-        PutRecordsRequest
-          .builder()
-          .streamName(streamName)
-          .records(
-            envelope.map { e =>
-              PutRecordsRequestEntry.builder().partitionKey(e.key).data(SdkBytes.fromByteBuffer(e.byteBuffer)).build()
-            }.asJavaCollection
-          )
-          .build()
-      )
-      .toScala
-      .asAsync[F]
-      .void
-  }
+  override def busPublishDirectly[F[_]: Async](envelope: List[BusEnvelope]): F[Unit] =
+    Async[F].defer {
+      kinesisAsyncClient
+        .putRecords(
+          PutRecordsRequest
+            .builder()
+            .streamName(streamName)
+            .records(
+              envelope.map { e =>
+                PutRecordsRequestEntry.builder().partitionKey(e.key).data(SdkBytes.fromByteBuffer(e.byteBuffer)).build()
+              }.asJavaCollection
+            )
+            .build()
+        )
+        .toScala
+        .asAsync[F]
+    }.void
   override def busFetchNotProcessedDirectly[F[_]: Async](): F[List[BusEnvelope]] = Async[F].delay {
     fetchedRecords.map(r => KinesisEnvelope(r.partitionKey(), r.data(), None))
   }

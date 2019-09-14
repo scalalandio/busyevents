@@ -14,8 +14,8 @@
     <appender-ref ref="STDOUT" />
   </root>
 
-  <logger name="com.amazonaws" level="WARN" />
+  <logger name="com.amazonaws" level="off" />
   <logger name="software.amazon" level="off" />
-  <logger name="software.amazon.kinesis.coordinator.Scheduler" level="DEBUG" />
-  <logger name="event-bus" level="INFO" />
+  <logger name="software.amazon.kinesis.coordinator.Scheduler" level="WARN" />
+  <logger name="event-bus" level="ERROR" />
 </configuration>

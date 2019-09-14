@@ -42,14 +42,13 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
 
   private var sqsAsyncClient: SqsAsyncClient = _
   override def dlqEnvironment[F[_]: Async]: Resource[F, Unit] = {
-    val sqsQueue = AWSResources
-      .sqs[F](sqsConfig)
+    val sqsQueue = loggedResourceFrom("SqsAsyncClient")(AWSResources.sqs[F](sqsConfig))
       .map { sqs =>
         sqsAsyncClient = sqs
         sqs
       }
-      .flatMap { sqs =>
-        Resource.make[F, Unit] {
+      .flatTap { sqs =>
+        loggedResource[F, Unit](s"SQS queue '$sqsQueueName'") {
           Async[F].delay(sqs.createQueue(CreateQueueRequest.builder().queueName(sqsQueueName).build())).void
         } { _ =>
           Async[F].delay(sqs.deleteQueue(DeleteQueueRequest.builder().queueUrl(sqsQueueUrl).build())).void
@@ -58,7 +57,10 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
     sqsQueue.void
   }
   override def dlqConfigurator[F[_]: Sync]: Resource[F, EventBus.DeadLetterQueueConfigurator[Message]] =
-    AWSResources.sqs[F](sqsConfig).map(SQSDeadLetterQueueConfigurator(SQSDeadLetterQueueConfig(sqsQueueUrl), log))
+    loggedResourceFrom("SQSDeadLetterQueueConfigurator") {
+      loggedResourceFrom("SqsAsyncClient2")(AWSResources.sqs[F](sqsConfig))
+        .map(SQSDeadLetterQueueConfigurator(SQSDeadLetterQueueConfig(sqsQueueUrl), log))
+    }
 
   // test utilities
 

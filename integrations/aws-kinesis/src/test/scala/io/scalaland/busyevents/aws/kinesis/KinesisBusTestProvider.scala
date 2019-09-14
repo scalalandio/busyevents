@@ -6,7 +6,7 @@ import cats.effect.{ Async, Resource, Sync }
 import cats.implicits._
 import io.scalaland.busyevents.utils.FutureToAsync
 import software.amazon.awssdk.core.SdkBytes
-import software.amazon.awssdk.services.dynamodb.model.{ CreateTableRequest, DeleteTableRequest }
+import software.amazon.awssdk.services.dynamodb.model.DeleteTableRequest
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.model.{
   CreateStreamRequest,
@@ -60,65 +60,65 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   private var fetchedRecords:     List[KinesisClientRecord] = List.empty[KinesisClientRecord]
 
   private def kinesisResource[F[_]: Async] =
-    AWSResources
-      .kinesis[F](kinesisConfig)
+    loggedResourceFrom("KinesisAsyncClient")(AWSResources.kinesis[F](kinesisConfig))
       .map { kinesis =>
         kinesisAsyncClient = kinesis
         kinesis
       }
-      .flatMap { kinesis =>
-        Resource.make[F, KinesisAsyncClient] {
+      .flatTap { kinesis =>
+        loggedResource(s"Kinesis stream '$streamName'") {
           Async[F].defer {
             kinesis
               .createStream(CreateStreamRequest.builder().streamName(streamName).shardCount(1).build())
               .toScala
-              .asAsync
-          } *> kinesis.pure[F]
+              .asAsync[F]
+          }
         } { _ =>
           Async[F].defer {
-            kinesis.deleteStream(DeleteStreamRequest.builder().streamName(streamName).build()).toScala.asAsync
+            kinesis.deleteStream(DeleteStreamRequest.builder().streamName(streamName).build()).toScala.asAsync[F]
           }.void
         }
       }
 
   private def dynamoDBResource[F[_]: Async] =
-    AWSResources.dynamo[F](dynamoConfig).flatMap { dynamo =>
-      Resource.make[F, DynamoDbAsyncClient] {
-        Async[F].defer {
-          dynamo.createTable(CreateTableRequest.builder().tableName(dynamoTableName).build()).toScala.asAsync *>
-            dynamo.createTable(CreateTableRequest.builder().tableName(dynamoTableName2).build()).toScala.asAsync
-        } *> dynamo.pure[F]
-      } { _ =>
-        Async[F].defer {
-          dynamo.deleteTable(DeleteTableRequest.builder().tableName(dynamoTableName2).build()).toScala.asAsync *>
-            dynamo.deleteTable(DeleteTableRequest.builder().tableName(dynamoTableName).build()).toScala.asAsync
-        }.void
+    loggedResourceFrom("DynamoDbAsyncClient")(AWSResources.dynamo[F](dynamoConfig))
+      .flatTap { dynamo =>
+        loggedResource(s"DynamoDB table '$dynamoTableName'") {
+          ().pure[F] // table is created by a consumer thread
+        } { _ =>
+          Async[F].defer {
+            dynamo.deleteTable(DeleteTableRequest.builder().tableName(dynamoTableName).build()).toScala.asAsync[F]
+          }.void
+        }
       }
-    }
+      .flatTap { dynamo =>
+        loggedResource(s"DynamoDB table '$dynamoTableName2'") {
+          ().pure[F] // table is created by a consumer thread
+        } { _ =>
+          Async[F].defer {
+            dynamo.deleteTable(DeleteTableRequest.builder().tableName(dynamoTableName2).build()).toScala.asAsync[F]
+          }.void
+        }
+      }
 
-  private def cloudwatchResource[F[_]: Async] = AWSResources.cloudWatch[F]()
+  private def cloudwatchResource[F[_]: Async] =
+    loggedResourceFrom("CloudWatchAsyncClient")(AWSResources.cloudWatch[F]())
 
   private class TestRecordProcessor extends ShardRecordProcessor {
-    override def initialize(initializationInput: InitializationInput) = {
+    override def initialize(initializationInput: InitializationInput) =
       initialized = true
-      println(s"initialize for ${initializationInput.shardId()}")
-    }
-    override def processRecords(processRecordsInput: ProcessRecordsInput) = {
+    override def processRecords(processRecordsInput: ProcessRecordsInput) =
       fetchedRecords = fetchedRecords ++ processRecordsInput.records().asScala
-      println("new events!")
-      println(fetchedRecords)
-    }
     override def leaseLost(leaseLostInput:   LeaseLostInput) = ()
-    override def shardEnded(shardEndedInput: ShardEndedInput) = {
-      println("shard input eded")
+    override def shardEnded(shardEndedInput: ShardEndedInput) =
       shardEndedInput.checkpointer.checkpoint()
-    }
-    override def shutdownRequested(shutdownRequestedInput: ShutdownRequestedInput) = ()
+    override def shutdownRequested(shutdownRequestedInput: ShutdownRequestedInput) =
+      shutdownRequestedInput.checkpointer.checkpoint()
   }
 
   private def scheduler[F[_]: Async] = (kinesisResource[F], dynamoDBResource[F], cloudwatchResource[F]).tupled.flatMap {
     case (kinesis, dynamo, cloudwatch) =>
-      Resource.make[F, Scheduler] {
+      loggedResource("Kinesis Scheduler") {
         Async[F].delay {
           val schedulerConfig = new ConfigsBuilder(
             streamName,
@@ -157,17 +157,19 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
   }
 
   private def consumerThread[F[_]: Async] = scheduler[F].flatMap { s =>
-    Resource.make[F, Thread] {
+    loggedResource("Kinesis Consumer thread") {
       val schedulerThread = new Thread(s)
       schedulerThread.setDaemon(true)
       schedulerThread.start()
-      10.tailRecM[F, Thread] { countdown: Int =>
+      30.tailRecM[F, Thread] { countdown: Int =>
         if (initialized) schedulerThread.asRight[Int].pure[F]
         else if (countdown >= 0 && !initialized)
           Async[F].defer {
-            Thread.sleep(100)
+            Thread.sleep(1000)
             (countdown - 1).asLeft[Thread].pure[F]
-          } else Async[F].raiseError(new Exception("Unable to initialize scheduler thread"))
+          } else
+          Sync[F].delay(schedulerThread.interrupt()) *>
+            new Exception("Unable to initialize scheduler thread").raiseError[F, Either[Int, Thread]]
       }
     } { schedulerThread =>
       Async[F].delay(schedulerThread.interrupt())
@@ -176,11 +178,13 @@ trait KinesisBusTestProvider extends BusTestProvider with AWSTestProvider {
 
   override def busEnvironment[F[_]:  Async]: Resource[F, Unit] = consumerThread[F].void
   override def busConfigurator[F[_]: Sync]: Resource[F, EventBus.BusConfigurator[KinesisEnvelope]] =
-    (
-      AWSResources.kinesis[F](kinesisConfig),
-      AWSResources.dynamo[F](dynamoConfig),
-      AWSResources.cloudWatch[F]()
-    ).mapN(KinesisBusConfigurator(KinesisBusConfig(appName, streamName, dynamoTableName), log))
+    loggedResourceFrom("KinesisBusConfigurator") {
+      (
+        loggedResourceFrom("KinesisAsyncClient2")(AWSResources.kinesis[F](kinesisConfig)),
+        loggedResourceFrom("DynamoDBAsyncClient2")(AWSResources.dynamo[F](dynamoConfig)),
+        loggedResourceFrom("CloudWatchAsyncClient2")(AWSResources.cloudWatch[F]())
+      ).mapN(KinesisBusConfigurator(KinesisBusConfig(appName, streamName, dynamoTableName), log))
+    }
 
   // test utilities
 

@@ -9,15 +9,22 @@
     </encoder>
   </appender>
 
-  <!--<root level="error">-->
+  <!-- default logging -->
   <root level="off">
     <appender-ref ref="STDOUT" />
   </root>
+
+  <!-- Akka -->
+  <logger name="akka" level="warn" />
 
   <!-- AWS error logging -->
   <logger name="com.amazonaws" level="off" />
   <logger name="software.amazon" level="off" />
   <logger name="software.amazon.kinesis.coordinator.Scheduler" level="off" />
+
+  <!-- Kinesis Stream logging -->
+  <logger name="px.kinesis.stream.consumer.checkpoint.CheckpointTrackerActor" level="info" />
+  <logger name="px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor" level="info" />
 
   <!-- Event tests -->
   <logger name="event-bus" level="INFO" />

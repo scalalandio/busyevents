@@ -7,7 +7,7 @@ import scala.util.{ Failure, Success }
 
 package object utils {
 
-  implicit class FutureToAsync[A](val future: Future[A]) extends AnyVal {
+  implicit class FutureToAsync[A](future: => Future[A]) {
 
     def asAsync[F[_]: Async](implicit ec: ExecutionContext): F[A] = Async[F].async { callback =>
       future.onComplete {

@@ -4,17 +4,19 @@ import akka.stream.scaladsl._
 import akka.{ Done, NotUsed }
 import akka.actor.ActorSystem
 import akka.stream.{ ActorMaterializer, SharedKillSwitch }
-import cats.effect.{ Async, SyncIO, Timer }
+import cats.effect.{ Async, IO, Timer }
 import cats.implicits._
 import com.typesafe.scalalogging.Logger
 import io.scalaland.busyevents.utils.FutureToAsync
 import io.scalaland.busyevents.EventBus.BusConfigurator
 import px.kinesis.stream.consumer.Record
+import px.kinesis.stream.consumer.checkpoint.CheckpointConfig
 import software.amazon.awssdk.core.SdkBytes
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
 import software.amazon.awssdk.services.kinesis.model.{ PutRecordsRequest, PutRecordsRequestEntry }
+import software.amazon.kinesis.coordinator.SchedulerCoordinatorFactory
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters._
@@ -64,9 +66,11 @@ class KinesisBusConfigurator(
         .watchTermination()(Keep.both)
         .mapMaterializedValue {
           case (publishSink, terminationFuture) =>
+            implicit val timer = IO.timer(ExecutionContext.Implicits.global)
             // custom Scheduler is a reason we haven't used px.kinesis.stream.consumer.source(_)
-            (SyncIO(log.info("Creating new Scheduler")) *>
-              busSchedulerFactory[SyncIO](workerId, killSwitch, publishSink).map(ec.execute).allocated.map {
+            // TODO: since 0.1.7 there is ConsumerConfig which we could use instead of maintaining our own
+            (IO(log.info("Creating new Scheduler")) *>
+              busSchedulerFactory[IO](workerId, killSwitch, publishSink).map(ec.execute).allocated.map {
                 case (_, shutdown) =>
                   terminationFuture
                     .map { _ =>
@@ -83,9 +87,7 @@ class KinesisBusConfigurator(
               }).unsafeRunSync()
         }
         .mapMaterializedValue(_ => NotUsed.getInstance)
-        .map { record =>
-          KinesisEnvelope(record.key, record.data.asByteBuffer, Option(record.markProcessed))
-      }
+        .map(KinesisEnvelope.fromKinesisStreamRecord)
 
   override def commitEventConsumed(
     implicit system: ActorSystem,
@@ -95,11 +97,13 @@ class KinesisBusConfigurator(
     Flow[KinesisEnvelope]
       .mapAsync(1) { envelope =>
         envelope.pure[Future].flatMap {
-          case KinesisEnvelope(key, _, commit) =>
-            commit.map(_()).getOrElse(Done.pure[Future]).map { d =>
-              log.info(s"Event ${key} committed on Kinesis")
-              d
-            }
+          case KinesisEnvelope(key, _, Some(commit)) =>
+            val d = commit()
+            log.info(s"Event $key committed on Kinesis")
+            d
+          case KinesisEnvelope(key, _, _) =>
+            log.warn(s"Event $key not committed on Kinesis")
+            Done.pure[Future]
         }
       }
       .to(Sink.ignore)
@@ -115,10 +119,13 @@ object KinesisBusConfigurator {
     *
     * uses "default" KinesisBusSchedulerFactory
     */
-  def apply(kinesisBusConfig: KinesisBusConfig, log: Logger)(
-    kinesisAsyncClient:       KinesisAsyncClient,
-    dynamoDbAsyncClient:      DynamoDbAsyncClient,
-    cloudWatchAsyncClient:    CloudWatchAsyncClient
+  def apply(kinesisBusConfig:   KinesisBusConfig,
+            log:                Logger,
+            checkpointConfig:   CheckpointConfig = CheckpointConfig(),
+            coordinatorFactory: SchedulerCoordinatorFactory = new SchedulerCoordinatorFactory)(
+    kinesisAsyncClient:         KinesisAsyncClient,
+    dynamoDbAsyncClient:        DynamoDbAsyncClient,
+    cloudWatchAsyncClient:      CloudWatchAsyncClient
   ): KinesisBusConfigurator =
     new KinesisBusConfigurator(
       kinesisBusConfig,
@@ -129,7 +136,9 @@ object KinesisBusConfigurator {
         log,
         kinesisAsyncClient,
         dynamoDbAsyncClient,
-        cloudWatchAsyncClient
+        cloudWatchAsyncClient,
+        checkpointConfig,
+        coordinatorFactory
       )
     )
 }

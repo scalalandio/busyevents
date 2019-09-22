@@ -1,6 +1,6 @@
 package io.scalaland.busyevents
 
-import cats.effect.{ Async, Resource, Sync, Timer }
+import cats.effect.{ Async, Resource, Timer }
 
 trait BusTestProvider extends TestProvider {
 
@@ -16,12 +16,12 @@ trait BusTestProvider extends TestProvider {
   implicit def busExtractor: Extractor[BusEnvelope]
 
   def busEnvironment[F[_]:  Async: Timer]: Resource[F, Unit]
-  def busConfigurator[F[_]: Sync]: Resource[F, EventBus.BusConfigurator[BusEnvelope]]
+  def busConfigurator[F[_]: Async]: Resource[F, EventBus.BusConfigurator[BusEnvelope]]
 
   // test utilities
 
   def isSafeForPublishing(msgSizes: Seq[Long]): Boolean
   def busPublishDirectly[F[_]:           Async](events: List[BusEnvelope]): F[Unit]
-  def busFetchNotProcessedDirectly[F[_]: Async](): F[List[BusEnvelope]]
-  def busMarkAllAsProcessed[F[_]:        Async]: F[Unit]
+  def busFetchNotProcessedDirectly[F[_]: Async: Timer]: F[List[BusEnvelope]]
+  def busMarkAllAsProcessed[F[_]:        Async: Timer]: F[Unit]
 }

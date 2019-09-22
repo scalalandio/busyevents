@@ -7,7 +7,7 @@ import akka.actor.{ ActorRef, ActorSystem }
 import akka.event.LoggingAdapter
 import akka.stream.{ ActorMaterializer, SharedKillSwitch }
 import akka.stream.scaladsl.Sink
-import cats.effect.{ Resource, Sync }
+import cats.effect.{ Resource, Sync, Timer }
 import cats.implicits._
 import com.typesafe.scalalogging.Logger
 import px.kinesis.stream.consumer.{ Record, RecordProcessorFactoryImpl }
@@ -21,6 +21,7 @@ import software.amazon.kinesis.retrieval.polling.PollingConfig
 import software.amazon.kinesis.retrieval.RetrievalConfig
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
                                  log:                   Logger,
@@ -33,7 +34,7 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
 
   import kinesisBusConfig._
 
-  def apply[F[_]: Sync](workerId: String, killSwitch: SharedKillSwitch, publishSink: Sink[Record, NotUsed])(
+  def apply[F[_]: Sync: Timer](workerId: String, killSwitch: SharedKillSwitch, publishSink: Sink[Record, NotUsed])(
     implicit system: ActorSystem,
     materializer:    ActorMaterializer,
     ec:              ExecutionContext
@@ -74,7 +75,17 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
           retrievalConfig
         )
       }
-      .fproduct(scheduler => Sync[F].delay(scheduler.shutdown()))
+      .fproduct(
+        scheduler =>
+          Sync[F].delay(scheduler.startGracefulShutdown()).flatMap { f =>
+            60.tailRecM[F, Unit] { attempts =>
+              if (f.isDone) ().asRight[Int].pure[F]
+              else if (f.isCancelled) new Exception("Scheduler shutdown cancelled").raiseError[F, Either[Int, Unit]]
+              else if (attempts < 0) new Exception("Scheduler shutdown timed out").raiseError[F, Either[Int, Unit]]
+              else Timer[F].sleep(1.second) *> (attempts - 1).asLeft[Unit].pure[F]
+            }
+        }
+      )
   )
 
   // overridable
@@ -103,7 +114,7 @@ class KinesisBusSchedulerFactory(kinesisBusConfig:      KinesisBusConfig,
       publishSink,
       workerId,
       new CheckpointTracker(
-        UUID.randomUUID().toString, // prevent actor name [...] is not unique! (see below)
+        UUID.randomUUID().toString, // prevents "actor name [...] is not unique!" (see below)
         checkpointConfig.maxBufferSize,
         checkpointConfig.maxDurationInSeconds,
         checkpointConfig.completionTimeout,

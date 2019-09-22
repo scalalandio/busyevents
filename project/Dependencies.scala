@@ -34,7 +34,7 @@ object Dependencies {
   // clients
   val awsSDKCore         = "software.amazon.awssdk"       %  "aws-core"                    % awsSdkVersion
   val awsNioClient       = "software.amazon.awssdk"       %  "netty-nio-client"            % awsSdkVersion
-  val kinesisClient      = "software.amazon.kinesis"      %  "amazon-kinesis-client"       % "2.2.2"
+  val kinesisClient      = "software.amazon.kinesis"      %  "amazon-kinesis-client"       % "2.2.3"
   // functional libraries
   val cats               = "org.typelevel"                %% "cats-core"                   % catsVersion
   val catsEffect         = "org.typelevel"                %% "cats-effect"                 % catsEffectVersion

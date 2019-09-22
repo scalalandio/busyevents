@@ -15,7 +15,7 @@ object EventBusResources {
     Resource.make {
       Sync[F].delay(create)
     } { system =>
-      Sync[F].defer(system.terminate().asAsync[F].void)
+      system.terminate().asAsync[F].void
     }
 
   def implicitDeps[F[_]: Async](

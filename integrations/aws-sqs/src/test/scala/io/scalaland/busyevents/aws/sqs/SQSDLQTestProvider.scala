@@ -79,14 +79,14 @@ trait SQSDLQTestProvider extends DLQTestProvider with AWSTestProvider {
         .toScala
         .asAsync[F]
     }.void
-  override def dlqFetchTopNotProcessedDirectly[F[_]: Async](): F[List[DLQEnvelope]] = Async[F].defer {
+  override def dlqFetchTopNotProcessedDirectly[F[_]: Async: Timer]: F[List[DLQEnvelope]] = Async[F].defer {
     sqsAsyncClient
       .receiveMessage(ReceiveMessageRequest.builder().queueUrl(sqsQueueUrl).maxNumberOfMessages(10).build())
       .toScala
       .asAsync[F]
       .map(_.messages().asScala.toList)
   }
-  override def dlqMarkAllAsProcessed[F[_]: Async]: F[Unit] =
+  override def dlqMarkAllAsProcessed[F[_]: Async: Timer]: F[Unit] =
     Async[F].defer {
       sqsAsyncClient.purgeQueue(PurgeQueueRequest.builder().queueUrl(sqsQueueUrl).build()).toScala.asAsync[F]
     }.void

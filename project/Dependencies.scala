@@ -17,7 +17,7 @@ object Dependencies {
   val catsVersion       = "2.0.0"
   val catsEffectVersion = "2.0.0"
   val circeVersion      = "0.12.1"
-  val specs2Version     = "4.6.0"
+  val specs2Version     = "4.7.1"
 
   // resolvers
   val resolvers = Seq(
@@ -60,9 +60,9 @@ trait Dependencies {
   // resolvers
   val commonResolvers = resolvers
 
-  val mainDeps = Seq(akkaSlf4j, akkaStream, cats, catsEffect, scalaLogging)
+  val mainDeps = Seq(akkaStream, cats, catsEffect, scalaLogging)
 
-  val testDeps = Seq(spec2Core, spec2Scalacheck)
+  val testDeps = Seq(akkaSlf4j, logback, spec2Core, spec2Scalacheck)
 
   implicit final class ProjectRoot(project: Project) {
 
